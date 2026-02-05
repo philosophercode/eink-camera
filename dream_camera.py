@@ -289,53 +289,31 @@ into the new scene with proper lighting and shadows."""
 
         return combined
 
-    def get_loading_bar_region(self, progress):
-        """Create just the loading bar region image."""
-        from PIL import ImageDraw, ImageFont
+    def get_spinner_region(self, frame):
+        """Create a spinning circle indicator."""
+        from PIL import ImageDraw
+        import math
 
-        # Bar dimensions
-        self.bar_height = 100  # Total region height
-        self.bar_y = self.height - self.bar_height
-        bar_margin = 50
-        bar_inner_height = 40
-        bar_width = self.width - (bar_margin * 2)
-
-        # Create just the bar region
-        region = Image.new('L', (self.width, self.bar_height), 255)
+        # Spinner dimensions
+        self.spinner_size = 120
+        region = Image.new('L', (self.spinner_size, self.spinner_size), 255)
         draw = ImageDraw.Draw(region)
 
-        # Draw bar background (gray)
-        bar_top = 50
-        draw.rectangle(
-            [bar_margin, bar_top, bar_margin + bar_width, bar_top + bar_inner_height],
-            fill=200, outline=0, width=3
-        )
+        cx, cy = self.spinner_size // 2, self.spinner_size // 2
+        radius = 40
 
-        # Draw progress (black)
-        progress_width = int(bar_width * progress)
-        if progress_width > 0:
-            draw.rectangle(
-                [bar_margin + 3, bar_top + 3, bar_margin + 3 + progress_width, bar_top + bar_inner_height - 3],
-                fill=0
-            )
+        # Draw circle outline
+        draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                     outline=180, width=6)
 
-        # Add "DREAMING..." text above bar
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
-        except:
-            font = None
-        draw.text((self.width // 2, bar_top - 10), f"DREAMING... {self.style.upper()}",
-                  anchor="mb", font=font, fill=0)
+        # Draw spinning arc (darker)
+        arc_length = 90  # degrees
+        start_angle = (frame * 45) % 360
+        end_angle = start_angle + arc_length
+        draw.arc([cx - radius, cy - radius, cx + radius, cy + radius],
+                 start=start_angle, end=end_angle, fill=0, width=8)
 
         return region
-
-    def add_loading_bar(self, image, progress):
-        """Add a loading bar at the bottom of the image (for initial display)."""
-        img = image.copy()
-        bar_region = self.get_loading_bar_region(progress)
-        bar_y = self.height - self.bar_height
-        img.paste(bar_region, (0, bar_y))
-        return img
 
     def dream_and_display(self, side_by_side=False):
         """Capture, dream, and display with loading animation."""
@@ -344,9 +322,13 @@ into the new scene with proper lighting and shadows."""
         print("Capturing...\r")
         photo = self.capture_photo()
 
-        # Show photo immediately with loading bar at 0%
-        preview = self.add_loading_bar(photo.convert('L').resize((self.width, self.height)), 0)
-        self.display.show_image(preview, mode=MODE_A2)
+        # Show photo immediately
+        photo_gray = photo.convert('L').resize((self.width, self.height))
+        self.display.show_image(photo_gray, mode=MODE_A2)
+
+        # Spinner position (top right corner with margin)
+        spinner_x = self.width - self.spinner_size - 30
+        spinner_y = 30
 
         # Start AI processing in background thread
         result = [None]
@@ -361,23 +343,18 @@ into the new scene with proper lighting and shadows."""
         thread = threading.Thread(target=process)
         thread.start()
 
-        # Animate loading bar while waiting (partial refresh only)
+        # Animate spinner while waiting (partial refresh only)
         print("Processing with AI...\r")
         start = time.time()
-        progress = 0
-        bar_y = self.height - self.bar_height
+        frame = 0
 
         while thread.is_alive():
-            # Increment progress (slow down as it approaches 90%)
-            if progress < 0.9:
-                progress += 0.05
-
-            # Update just the loading bar region (partial refresh)
-            bar_region = self.get_loading_bar_region(progress)
-            self.display.display(bar_region.tobytes(), x=0, y=bar_y,
-                                w=self.width, h=self.bar_height, mode=MODE_A2)
-
-            time.sleep(0.3)
+            # Update just the spinner region (partial refresh)
+            spinner = self.get_spinner_region(frame)
+            self.display.display(spinner.tobytes(), x=spinner_x, y=spinner_y,
+                                w=self.spinner_size, h=self.spinner_size, mode=MODE_A2)
+            frame += 1
+            time.sleep(0.2)
 
         thread.join()
         print(f"  Dream time: {time.time() - start:.1f}s\r")
