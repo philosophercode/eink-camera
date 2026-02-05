@@ -125,6 +125,61 @@ static uint8_t* load_jpeg_as_gray(const char *filename, int *width, int *height)
     return buf;
 }
 
+// Video streaming mode - continuous capture and display
+static void do_stream(IT8951_USB *dev) {
+    printf("Streaming mode (press any key to stop)...\n");
+
+    int frame = 0;
+    double start_time = get_time_ms();
+
+    while (1) {
+        // Check for keypress to stop
+        char c;
+        if (read(STDIN_FILENO, &c, 1) == 1) {
+            printf("\nStopping stream...\n");
+            break;
+        }
+
+        double t0 = get_time_ms();
+
+        // Capture frame using libcamera-still (fast mode)
+        char cmd[512];
+        snprintf(cmd, sizeof(cmd),
+            "libcamera-still -o /tmp/frame.jpg --width %d --height %d "
+            "-t 1 --nopreview --immediate 2>/dev/null",
+            DISPLAY_WIDTH, DISPLAY_HEIGHT);
+        system(cmd);
+
+        // Convert to grayscale
+        snprintf(cmd, sizeof(cmd),
+            "convert /tmp/frame.jpg -colorspace Gray -depth 8 gray:/tmp/frame.raw");
+        system(cmd);
+
+        // Read and display
+        FILE *f = fopen("/tmp/frame.raw", "rb");
+        if (f) {
+            int size = DISPLAY_WIDTH * DISPLAY_HEIGHT;
+            uint8_t *buf = malloc(size);
+            if (buf) {
+                fread(buf, 1, size, f);
+                it8951_display(dev, buf, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, MODE_A2);
+                free(buf);
+            }
+            fclose(f);
+        }
+
+        frame++;
+        double elapsed = get_time_ms() - start_time;
+        double fps = frame / (elapsed / 1000.0);
+        printf("\rFrame %d (%.1f fps, %.0f ms/frame)", frame, fps, get_time_ms() - t0);
+        fflush(stdout);
+    }
+
+    double total = get_time_ms() - start_time;
+    printf("\nStreamed %d frames in %.1f sec (%.2f fps avg)\n",
+           frame, total/1000.0, frame/(total/1000.0));
+}
+
 // Do countdown and capture
 static void do_capture(IT8951_USB *dev) {
     printf("Countdown...\n");
@@ -165,6 +220,7 @@ int main(int argc, char **argv) {
         printf("E-Ink Camera\n");
         printf("Usage: sudo %s /dev/sdX\n", argv[0]);
         printf("  Press '1' to capture with countdown\n");
+        printf("  Press '2' to start video streaming\n");
         printf("  Press 'c' to clear display\n");
         printf("  Press 'q' to quit\n");
         return 1;
@@ -178,7 +234,7 @@ int main(int argc, char **argv) {
 
     printf("E-Ink Camera ready!\n");
     printf("Display: %dx%d\n", dev->width, dev->height);
-    printf("Press '1' to capture, 'c' to clear, 'q' to quit\n\n");
+    printf("Press '1' to capture, '2' to stream, 'c' to clear, 'q' to quit\n\n");
 
     enable_raw_mode();
 
@@ -191,6 +247,9 @@ int main(int argc, char **argv) {
             } else if (c == '1') {
                 do_capture(dev);
                 printf("\nReady for next capture (press '1')\n");
+            } else if (c == '2') {
+                do_stream(dev);
+                printf("\nReady (press '1' to capture, '2' to stream)\n");
             } else if (c == 'c' || c == 'C') {
                 printf("Clearing display...\n");
                 it8951_clear(dev, MODE_INIT);
