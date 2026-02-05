@@ -48,21 +48,21 @@ except ImportError:
     print("Install with: pip install google-genai pillow")
 
 
-# Dream styles/prompts
+# Environment backgrounds - photorealistic, keeps the person the same
 DREAM_STYLES = {
-    'surreal': "Reimagine this scene in a surrealist style like Salvador Dali - melting objects, impossible geometry, dreamlike atmosphere",
-    'noir': "Transform this into a dramatic film noir scene - high contrast, deep shadows, mysterious mood",
-    'anime': "Reimagine this as a Studio Ghibli anime scene - soft colors, whimsical details, magical atmosphere",
-    'sketch': "Transform this into an elegant pencil sketch - fine lines, cross-hatching, artistic shading",
-    'cyberpunk': "Reimagine this as a cyberpunk scene - neon lights, rain, futuristic technology, Blade Runner aesthetic",
-    'vintage': "Transform this into a vintage 1920s photograph - sepia tones, film grain, art deco elements",
-    'abstract': "Reimagine this as an abstract expressionist painting - bold shapes, emotional colors, gestural marks",
-    'nightmare': "Transform this into a dark, unsettling scene - distorted proportions, eerie lighting, subtle wrongness",
-    'dreamy': "Make this more dreamlike and ethereal - soft focus, floating elements, pastel colors, magical realism",
-    'minimal': "Simplify this into a minimal Japanese ink painting - few brushstrokes, lots of white space, zen aesthetic",
+    'jungle': "dense tropical rainforest with lush green foliage, exotic plants, hanging vines, dappled sunlight through the canopy",
+    'underwater': "deep ocean scene with blue water, coral reefs, tropical fish swimming around, light rays from above, bubbles",
+    'city': "Times Square New York City at night with bright neon signs, yellow taxis, crowds of people, urban energy",
+    'space': "floating in outer space with Earth visible below, stars and galaxies in background, astronaut vibes",
+    'beach': "beautiful tropical beach at sunset, palm trees, golden sand, turquoise water, orange and pink sky",
+    'mountain': "top of a snowy mountain peak, dramatic clouds below, bright blue sky, epic alpine vista",
+    'mars': "surface of Mars with red rocky terrain, dusty atmosphere, distant mountains, alien landscape",
+    'tokyo': "neon-lit Tokyo street at night, Japanese signs, rain-slicked streets, cyberpunk atmosphere",
+    'safari': "African savanna at golden hour, acacia trees, distant elephants, dramatic sky, wild adventure",
+    'castle': "inside a grand medieval castle, stone walls, torches, red banners, dramatic lighting",
 }
 
-DEFAULT_STYLE = 'dreamy'
+DEFAULT_STYLE = 'jungle'
 
 
 class DreamCamera:
@@ -100,24 +100,21 @@ class DreamCamera:
         subprocess.run(cmd, capture_output=True)
         return Image.open(tmp_path)
 
-    def describe_image(self, image):
-        """Use Gemini to describe the image creatively."""
+    def describe_person(self, image):
+        """Use Gemini to describe the person in the image."""
         if not self.client:
-            return "A mysterious scene awaits interpretation..."
+            return "a person"
 
         # Convert PIL image to bytes
         buf = io.BytesIO()
         image.save(buf, format='JPEG')
         image_bytes = buf.getvalue()
 
-        prompt = f"""Look at this image and create a vivid, creative description
-        that could be used to generate a reimagined version.
-
-        Style requested: {DREAM_STYLES[self.style]}
-
-        Describe what you see, then describe how it would look transformed
-        in this style. Be specific about colors, mood, composition, and details.
-        Keep it to 2-3 sentences focused on visual elements."""
+        prompt = """Describe the person in this photo in detail for image generation.
+        Include: their apparent age, gender, ethnicity, hair (color, style, length),
+        facial features, expression, what they're wearing, their pose/posture.
+        Be specific and detailed. Keep it to 2-3 sentences.
+        Only describe the PERSON, not the background."""
 
         try:
             response = self.client.models.generate_content(
@@ -135,24 +132,33 @@ class DreamCamera:
             return response.text
         except Exception as e:
             print(f"  Gemini error: {e}")
-            return "A scene transformed by imagination..."
+            return "a person"
 
     def dream_image(self, image):
         """
-        Transform an image through AI "dreaming".
+        Place the person from the photo into a new environment.
 
-        Returns a new PIL Image that's a reimagined version.
+        Returns a new PIL Image with the person in the new background.
         """
-        print(f"  Dreaming in '{self.style}' style...")
+        print(f"  Teleporting to '{self.style}'...")
 
-        # Get creative description from Gemini
-        description = self.describe_image(image)
-        print(f"  Vision: {description[:100]}...")
+        # Get detailed description of the person
+        person_desc = self.describe_person(image)
+        print(f"  Person: {person_desc[:80]}...")
+
+        background = DREAM_STYLES[self.style]
 
         # Try to generate new image with Gemini image generation
         if self.client:
             try:
-                prompt = f"{DREAM_STYLES[self.style]}. Based on this scene: {description}"
+                prompt = f"""Photorealistic image of {person_desc}
+
+The person is standing/positioned in this environment: {background}
+
+IMPORTANT: Keep the person looking EXACTLY as described - same face, same clothes,
+same pose. Only change the background/environment. Make it look like a real photograph,
+not artistic or stylized. Professional photography quality."""
+
                 response = self.client.models.generate_content(
                     model='gemini-2.0-flash-exp-image-generation',
                     contents=prompt,
