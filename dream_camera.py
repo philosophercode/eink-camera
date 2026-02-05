@@ -152,17 +152,29 @@ class DreamCamera:
         # Try to generate new image with Gemini image generation
         if self.client:
             try:
-                prompt = f"""Photorealistic image of {person_desc}
+                # Convert image to bytes
+                buf = io.BytesIO()
+                image.save(buf, format='JPEG')
+                image_bytes = buf.getvalue()
 
-The person is standing/positioned in this environment: {background}
+                prompt = f"""Take this photo and place the person into a new environment: {background}
 
-IMPORTANT: Keep the person looking EXACTLY as described - same face, same clothes,
-same pose. Only change the background/environment. Make it look like a real photograph,
-not artistic or stylized. Professional photography quality."""
+Keep the person looking EXACTLY the same - same face, same clothes, same pose, same expression.
+Only change the background/environment around them. Make it look like a real photograph,
+photorealistic, professional photography quality. The person should look naturally composited
+into the new scene with proper lighting and shadows."""
 
                 response = self.client.models.generate_content(
                     model='nano-banana-pro-preview',
-                    contents=prompt,
+                    contents=[
+                        types.Content(
+                            role='user',
+                            parts=[
+                                types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
+                                types.Part.from_text(text=prompt),
+                            ]
+                        )
+                    ],
                     config=types.GenerateContentConfig(
                         response_modalities=['image', 'text'],
                     )
