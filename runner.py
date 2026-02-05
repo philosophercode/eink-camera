@@ -1,36 +1,115 @@
 #!/usr/bin/env python3
 """
 FAST Donkey Kong-style runner for e-ink display.
-Optimized for maximum speed with A2 partial refresh.
+Now with FLIPS at corners!
 
 Usage:
     sudo python3 runner.py /dev/sg0
 """
 
-import os
 import sys
 import time
 from PIL import Image, ImageDraw
 
 from eink import EInkDisplay, MODE_A2
 
-# Tiny sprite (8x8) for faster refresh - smaller = faster!
-SPRITE_R = [
-    " ██  ",
-    "████ ",
-    " ██  ",
-    "████ ",
-    " █ █ ",
-    "█   █",
+# Bigger sprite with more detail
+SPRITE_RUN_R = [
+    "    ████████    ",
+    "   ██████████   ",
+    "   ███░░░░███   ",
+    "   ██░██░██░██  ",
+    "   ████░░░████  ",
+    "    ██████████  ",
+    "      ████      ",
+    "    ████████    ",
+    "   ██████████   ",
+    "  ████ ██ ████  ",
+    " ███   ██   ███ ",
+    "       ██       ",
+    "      ████      ",
+    "     ██  ██     ",
+    "    ███  ███    ",
+    "   ████  ████   ",
 ]
 
-SPRITE_L = [
-    "  ██ ",
-    " ████",
-    "  ██ ",
-    " ████",
-    " █ █ ",
-    "█   █",
+SPRITE_RUN_L = [row[::-1] for row in SPRITE_RUN_R]
+
+# Flip animation frames (somersault!)
+SPRITE_FLIP_1 = [
+    "                ",
+    "    ████████    ",
+    "   ██████████   ",
+    "  ████░░░░████  ",
+    "  ███░██░███░█  ",
+    "  █████░░█████  ",
+    "   ██████████   ",
+    "  ████████████  ",
+    " ██████████████ ",
+    " ██ ████████ ██ ",
+    "    ██    ██    ",
+    "   ██      ██   ",
+    "  ███      ███  ",
+    "                ",
+    "                ",
+    "                ",
+]
+
+SPRITE_FLIP_2 = [
+    "                ",
+    "                ",
+    "   ███    ███   ",
+    "  ████    ████  ",
+    " █████    █████ ",
+    " ██████████████ ",
+    "  ████████████  ",
+    "   ██████████   ",
+    "   ███░░░░███   ",
+    "   ██░██░██░██  ",
+    "   ████░░░████  ",
+    "    ██████████  ",
+    "     ████████   ",
+    "                ",
+    "                ",
+    "                ",
+]
+
+SPRITE_FLIP_3 = [
+    "                ",
+    "                ",
+    "                ",
+    "  ███      ███  ",
+    "   ██      ██   ",
+    "    ██    ██    ",
+    " ██ ████████ ██ ",
+    " ██████████████ ",
+    "  ████████████  ",
+    "   ██████████   ",
+    "  █████░░█████  ",
+    "  ███░██░███░█  ",
+    "  ████░░░░████  ",
+    "   ██████████   ",
+    "    ████████    ",
+    "                ",
+]
+
+SPRITE_FLIP_4 = [
+    "                ",
+    "                ",
+    "                ",
+    "   ████  ████   ",
+    "    ███  ███    ",
+    "     ██  ██     ",
+    "      ████      ",
+    "       ██       ",
+    " ███   ██   ███ ",
+    "  ████ ██ ████  ",
+    "   ██████████   ",
+    "    ████████    ",
+    "      ████      ",
+    "    ██████████  ",
+    "   ████░░░████  ",
+    "   ██░██░██░██  ",
 ]
 
 
@@ -49,22 +128,36 @@ def sprite_to_image(sprite_data, scale=6):
                     x * scale, y * scale,
                     (x + 1) * scale - 1, (y + 1) * scale - 1
                 ], fill=0)
+            elif char == '░':
+                draw.rectangle([
+                    x * scale, y * scale,
+                    (x + 1) * scale - 1, (y + 1) * scale - 1
+                ], fill=180)
 
     return img
 
 
-class FastRunner:
-    """Optimized runner - single combined update region."""
+class FlippingRunner:
+    """Runner that does flips at corners!"""
 
     def __init__(self, display):
         self.display = display
         self.w = display.width
         self.h = display.height
 
-        # Small sprite = fast refresh
-        self.scale = 8
-        self.sprite_right = sprite_to_image(SPRITE_R, self.scale)
-        self.sprite_left = sprite_to_image(SPRITE_L, self.scale)
+        # Bigger sprite
+        self.scale = 6
+        self.sprite_right = sprite_to_image(SPRITE_RUN_R, self.scale)
+        self.sprite_left = sprite_to_image(SPRITE_RUN_L, self.scale)
+
+        # Flip frames
+        self.flip_frames = [
+            sprite_to_image(SPRITE_FLIP_1, self.scale),
+            sprite_to_image(SPRITE_FLIP_2, self.scale),
+            sprite_to_image(SPRITE_FLIP_3, self.scale),
+            sprite_to_image(SPRITE_FLIP_4, self.scale),
+        ]
+
         self.sprite_w = self.sprite_right.width
         self.sprite_h = self.sprite_right.height
 
@@ -72,49 +165,69 @@ class FastRunner:
         self.x = 100
         self.y = 100
         self.direction = 'right'
+        self.flipping = False
+        self.flip_frame = 0
 
-        # BIG steps = fewer updates = faster lap
-        self.speed = 80
-        self.margin = 80
+        # Movement
+        self.speed = 60
+        self.margin = 100
 
     def get_sprite(self):
+        if self.flipping:
+            return self.flip_frames[self.flip_frame % len(self.flip_frames)]
         if self.direction in ('right', 'down'):
             return self.sprite_right
         return self.sprite_left
 
-    def move(self):
-        """Move and return old position."""
+    def do_flip(self):
+        """Animate a flip at the corner."""
         old_x, old_y = self.x, self.y
+        for i in range(len(self.flip_frames)):
+            self.flip_frame = i
+            self.flipping = True
+            self.draw_fast(old_x, old_y)
+        self.flipping = False
+
+    def move(self):
+        """Move and return old position. Do flip at corners!"""
+        old_x, old_y = self.x, self.y
+        did_turn = False
 
         if self.direction == 'right':
             self.x += self.speed
             if self.x >= self.w - self.margin - self.sprite_w:
                 self.x = self.w - self.margin - self.sprite_w
                 self.direction = 'down'
+                did_turn = True
 
         elif self.direction == 'down':
             self.y += self.speed
             if self.y >= self.h - self.margin - self.sprite_h:
                 self.y = self.h - self.margin - self.sprite_h
                 self.direction = 'left'
+                did_turn = True
 
         elif self.direction == 'left':
             self.x -= self.speed
             if self.x <= self.margin:
                 self.x = self.margin
                 self.direction = 'up'
+                did_turn = True
 
         elif self.direction == 'up':
             self.y -= self.speed
             if self.y <= self.margin:
                 self.y = self.margin
                 self.direction = 'right'
+                did_turn = True
+
+        if did_turn:
+            self.do_flip()
 
         return old_x, old_y
 
     def draw_fast(self, old_x, old_y):
-        """Single combined region update - clear old + draw new in one refresh."""
-        # Calculate bounding box that covers both old and new positions
+        """Single combined region update."""
         min_x = int(min(old_x, self.x))
         min_y = int(min(old_y, self.y))
         max_x = int(max(old_x, self.x)) + self.sprite_w
@@ -123,16 +236,13 @@ class FastRunner:
         region_w = max_x - min_x
         region_h = max_y - min_y
 
-        # Create region with white background
         region = Image.new('L', (region_w, region_h), 255)
 
-        # Paste sprite at new position (relative to region)
         sprite = self.get_sprite()
         paste_x = int(self.x - min_x)
         paste_y = int(self.y - min_y)
         region.paste(sprite, (paste_x, paste_y))
 
-        # Single update!
         self.display.display(
             region.tobytes(),
             x=min_x, y=min_y,
@@ -149,20 +259,18 @@ def main():
     device = sys.argv[1]
     display = EInkDisplay(device)
 
-    print(f"=== FAST E-INK RUNNER ===")
+    print(f"=== FLIPPY RUNNER ===")
     print(f"Display: {display.width}x{display.height}")
     print("Ctrl+C to stop\n")
 
-    # Clear display first
     display.clear()
 
-    runner = FastRunner(display)
+    runner = FlippingRunner(display)
 
-    print("GO!")
+    print("GO! Watch for flips at corners!")
     lap = 0
     frames = 0
     start = time.time()
-    last_corner = None
 
     try:
         while True:
@@ -170,22 +278,18 @@ def main():
             runner.draw_fast(old_x, old_y)
             frames += 1
 
-            # Detect lap completion (back to top-left going right)
-            corner = (runner.direction, runner.x <= runner.margin + runner.speed)
-            if runner.direction == 'right' and runner.x == runner.margin + runner.speed and last_corner != corner:
-                if frames > 4:
+            # Count laps
+            if runner.direction == 'right' and runner.x <= runner.margin + runner.speed:
+                if frames > 10:
                     lap += 1
                     elapsed = time.time() - start
                     fps = frames / elapsed
-                    print(f"Lap {lap} | {fps:.1f} FPS | {elapsed:.1f}s total")
-            last_corner = corner
-
-            # NO SLEEP - go as fast as the display allows!
+                    print(f"Lap {lap} | {fps:.1f} FPS | {elapsed:.1f}s")
+                    frames = 0
+                    start = time.time()
 
     except KeyboardInterrupt:
-        elapsed = time.time() - start
-        fps = frames / elapsed
-        print(f"\n\nStats: {frames} frames, {lap} laps, {fps:.1f} FPS avg")
+        print(f"\n\nDone! {lap} laps completed")
         display.clear()
         display.close()
 
