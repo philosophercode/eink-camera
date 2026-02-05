@@ -145,7 +145,7 @@ class DreamCamera:
         # Get detailed description of the person
         person_desc = self.describe_person(image)
         if not quiet:
-            print(f"  Person: {person_desc[:80]}...\r")
+            print(f"  Person: {person_desc}\r")
 
         background = DREAM_STYLES[self.style]
 
