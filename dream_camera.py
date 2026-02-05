@@ -289,16 +289,92 @@ into the new scene with proper lighting and shadows."""
 
         return combined
 
+    def add_loading_bar(self, image, progress):
+        """Add a loading bar at the bottom of the image."""
+        from PIL import ImageDraw
+        img = image.copy()
+        draw = ImageDraw.Draw(img)
+
+        bar_height = 40
+        bar_y = self.height - bar_height - 20
+        bar_margin = 50
+        bar_width = self.width - (bar_margin * 2)
+
+        # Draw bar background (gray)
+        draw.rectangle(
+            [bar_margin, bar_y, bar_margin + bar_width, bar_y + bar_height],
+            fill=200, outline=0, width=3
+        )
+
+        # Draw progress (black)
+        progress_width = int(bar_width * progress)
+        if progress_width > 0:
+            draw.rectangle(
+                [bar_margin + 3, bar_y + 3, bar_margin + 3 + progress_width, bar_y + bar_height - 3],
+                fill=0
+            )
+
+        # Add "DREAMING..." text above bar
+        try:
+            from PIL import ImageFont
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+        except:
+            font = None
+        draw.text((self.width // 2, bar_y - 20), f"DREAMING... {self.style.upper()}",
+                  anchor="mb", font=font, fill=0)
+
+        return img
+
     def dream_and_display(self, side_by_side=False):
-        """Capture, dream, and display."""
+        """Capture, dream, and display with loading animation."""
+        import threading
+
         print("Capturing...\r")
         photo = self.capture_photo()
 
+        # Show photo immediately with loading bar at 0%
+        preview = self.add_loading_bar(photo.convert('L').resize((self.width, self.height)), 0)
+        self.display.show_image(preview, mode=MODE_A2)
+
+        # Start AI processing in background thread
+        result = [None]
+        error = [None]
+
+        def process():
+            try:
+                result[0] = self.dream_image(photo, quiet=True)
+            except Exception as e:
+                error[0] = e
+
+        thread = threading.Thread(target=process)
+        thread.start()
+
+        # Animate loading bar while waiting
         print("Processing with AI...\r")
         start = time.time()
-        dreamed = self.dream_image(photo)
+        progress = 0
+
+        while thread.is_alive():
+            # Increment progress (slow down as it approaches 90%)
+            if progress < 0.9:
+                progress += 0.05
+
+            # Update loading bar
+            preview = self.add_loading_bar(photo.convert('L').resize((self.width, self.height)), progress)
+            self.display.show_image(preview, mode=MODE_A2)
+
+            time.sleep(0.5)
+
+        thread.join()
         print(f"  Dream time: {time.time() - start:.1f}s\r")
 
+        if error[0]:
+            print(f"  Error: {error[0]}\r")
+            return
+
+        dreamed = result[0]
+
+        # Show final result
         print("Displaying...\r")
         if side_by_side:
             combined = self.make_side_by_side(photo, dreamed)
