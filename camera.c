@@ -43,60 +43,44 @@ static void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-// Create a large digit image (7-segment style)
-static void draw_digit(uint8_t *buf, int digit) {
-    memset(buf, 0xFF, DISPLAY_WIDTH * DISPLAY_HEIGHT);  // White background
+// Generate countdown digit using ImageMagick (circle with number)
+static uint8_t* generate_countdown_image(int digit) {
+    char cmd[1024];
+    const char *tmpfile = "/tmp/countdown.raw";
+    int size = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
-    int cx = DISPLAY_WIDTH / 2;
-    int cy = DISPLAY_HEIGHT / 2 - 50;
-    int w = 500, h = 700, t = 100;
+    // Use ImageMagick to create a centered number inside a circle
+    // White background, black circle outline, black number
+    snprintf(cmd, sizeof(cmd),
+        "convert -size %dx%d xc:white "
+        "-fill none -stroke black -strokewidth 20 "
+        "-draw \"circle %d,%d %d,%d\" "
+        "-fill black -stroke none "
+        "-font Helvetica-Bold -pointsize 500 -gravity center "
+        "-draw \"text 0,0 '%d'\" "
+        "-colorspace Gray -depth 8 gray:%s",
+        DISPLAY_WIDTH, DISPLAY_HEIGHT,
+        DISPLAY_WIDTH/2, DISPLAY_HEIGHT/2,           // circle center
+        DISPLAY_WIDTH/2 + 400, DISPLAY_HEIGHT/2,     // circle edge (radius 400)
+        digit,
+        tmpfile);
 
-    // 7-segment patterns: top, top-left, top-right, middle, bottom-left, bottom-right, bottom
-    int segs[10][7] = {
-        {1,1,1,0,1,1,1}, // 0
-        {0,0,1,0,0,1,0}, // 1
-        {1,0,1,1,1,0,1}, // 2
-        {1,0,1,1,0,1,1}, // 3
-        {0,1,1,1,0,1,0}, // 4
-        {1,1,0,1,0,1,1}, // 5
-        {1,1,0,1,1,1,1}, // 6
-        {1,0,1,0,0,1,0}, // 7
-        {1,1,1,1,1,1,1}, // 8
-        {1,1,1,1,0,1,1}, // 9
-    };
-
-    int *s = segs[digit % 10];
-    int x1 = cx - w/2, x2 = cx + w/2;
-    int y1 = cy - h/2, y2 = cy, y3 = cy + h/2;
-
-    // Draw filled rectangles for each segment (black = 0x00)
-    for (int y = 0; y < DISPLAY_HEIGHT; y++) {
-        for (int x = 0; x < DISPLAY_WIDTH; x++) {
-            int px = y * DISPLAY_WIDTH + x;
-
-            // Top segment
-            if (s[0] && x >= x1 && x <= x2 && y >= y1 && y <= y1 + t)
-                buf[px] = 0x00;
-            // Top-left
-            if (s[1] && x >= x1 && x <= x1 + t && y >= y1 && y <= y2)
-                buf[px] = 0x00;
-            // Top-right
-            if (s[2] && x >= x2 - t && x <= x2 && y >= y1 && y <= y2)
-                buf[px] = 0x00;
-            // Middle
-            if (s[3] && x >= x1 && x <= x2 && y >= y2 - t/2 && y <= y2 + t/2)
-                buf[px] = 0x00;
-            // Bottom-left
-            if (s[4] && x >= x1 && x <= x1 + t && y >= y2 && y <= y3)
-                buf[px] = 0x00;
-            // Bottom-right
-            if (s[5] && x >= x2 - t && x <= x2 && y >= y2 && y <= y3)
-                buf[px] = 0x00;
-            // Bottom
-            if (s[6] && x >= x1 && x <= x2 && y >= y3 - t && y <= y3)
-                buf[px] = 0x00;
-        }
+    if (system(cmd) != 0) {
+        return NULL;
     }
+
+    FILE *f = fopen(tmpfile, "rb");
+    if (!f) return NULL;
+
+    uint8_t *buf = malloc(size);
+    if (!buf) {
+        fclose(f);
+        return NULL;
+    }
+
+    fread(buf, 1, size, f);
+    fclose(f);
+    return buf;
 }
 
 // Capture photo using libcamera-still
@@ -143,16 +127,16 @@ static uint8_t* load_jpeg_as_gray(const char *filename, int *width, int *height)
 
 // Do countdown and capture
 static void do_capture(IT8951_USB *dev) {
-    uint8_t *buf = malloc(DISPLAY_WIDTH * DISPLAY_HEIGHT);
-    if (!buf) return;
-
     printf("Countdown...\n");
 
     // 3-2-1 countdown
     for (int i = 3; i >= 1; i--) {
         printf("%d...\n", i);
-        draw_digit(buf, i);
-        it8951_display(dev, buf, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, MODE_A2);
+        uint8_t *buf = generate_countdown_image(i);
+        if (buf) {
+            it8951_display(dev, buf, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, MODE_A2);
+            free(buf);
+        }
         if (i > 1) usleep(800000);  // 800ms between digits
     }
 
@@ -174,8 +158,6 @@ static void do_capture(IT8951_USB *dev) {
     } else {
         printf("Failed to load photo\n");
     }
-
-    free(buf);
 }
 
 int main(int argc, char **argv) {
