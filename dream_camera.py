@@ -30,14 +30,15 @@ from PIL import Image
 # Import our e-ink driver
 from eink import EInkDisplay, MODE_GC16, MODE_A2
 
-# Google AI imports
+# Google AI imports (new google-genai package)
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     HAS_GENAI = True
 except ImportError:
     HAS_GENAI = False
-    print("Warning: google-generativeai not installed")
-    print("Install with: pip install google-generativeai pillow")
+    print("Warning: google-genai not installed")
+    print("Install with: pip install google-genai pillow")
 
 
 # Dream styles/prompts
@@ -67,24 +68,16 @@ class DreamCamera:
         self.height = self.display.height
 
         # Initialize Gemini
+        self.client = None
         if HAS_GENAI:
             api_key = api_key or os.environ.get('GOOGLE_API_KEY')
             if api_key:
-                genai.configure(api_key=api_key)
-                self.model = genai.GenerativeModel('gemini-1.5-flash')
-                # For image generation, we'll use Imagen if available
-                try:
-                    self.imagen = genai.ImageGenerationModel('imagen-3.0-generate-001')
-                except:
-                    self.imagen = None
-                    print("Note: Imagen not available, using description-only mode")
+                self.client = genai.Client(api_key=api_key)
+                print("Gemini API connected!")
             else:
                 print("Warning: No GOOGLE_API_KEY set")
-                self.model = None
-                self.imagen = None
         else:
-            self.model = None
-            self.imagen = None
+            print("Warning: google-genai not installed")
 
     def capture_photo(self):
         """Capture a photo using libcamera."""
@@ -102,13 +95,13 @@ class DreamCamera:
 
     def describe_image(self, image):
         """Use Gemini to describe the image creatively."""
-        if not self.model:
+        if not self.client:
             return "A mysterious scene awaits interpretation..."
 
         # Convert PIL image to bytes
         buf = io.BytesIO()
         image.save(buf, format='JPEG')
-        buf.seek(0)
+        image_bytes = buf.getvalue()
 
         prompt = f"""Look at this image and create a vivid, creative description
         that could be used to generate a reimagined version.
@@ -119,8 +112,23 @@ class DreamCamera:
         in this style. Be specific about colors, mood, composition, and details.
         Keep it to 2-3 sentences focused on visual elements."""
 
-        response = self.model.generate_content([prompt, image])
-        return response.text
+        try:
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[
+                    types.Content(
+                        role='user',
+                        parts=[
+                            types.Part.from_text(text=prompt),
+                            types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
+                        ]
+                    )
+                ]
+            )
+            return response.text
+        except Exception as e:
+            print(f"  Gemini error: {e}")
+            return "A scene transformed by imagination..."
 
     def dream_image(self, image):
         """
@@ -135,20 +143,24 @@ class DreamCamera:
         print(f"  Vision: {description[:100]}...")
 
         # Try to generate new image with Imagen
-        if self.imagen:
+        if self.client:
             try:
-                prompt = f"{DREAM_STYLES[self.style]}. {description}"
-                result = self.imagen.generate_images(
+                prompt = f"{DREAM_STYLES[self.style]}. Based on: {description}"
+                response = self.client.models.generate_images(
+                    model='imagen-3.0-generate-002',
                     prompt=prompt,
-                    number_of_images=1,
-                    aspect_ratio="4:3",  # Close to e-ink ratio
+                    config=types.GenerateImagesConfig(
+                        number_of_images=1,
+                        aspect_ratio="4:3",
+                    )
                 )
-                if result.images:
-                    return result.images[0]._pil_image
+                if response.generated_images:
+                    img_bytes = response.generated_images[0].image.image_bytes
+                    return Image.open(io.BytesIO(img_bytes))
             except Exception as e:
                 print(f"  Imagen error: {e}")
 
-        # Fallback: create a text overlay on processed original
+        # Fallback: apply filters to original
         return self._fallback_dream(image, description)
 
     def _fallback_dream(self, image, description):
