@@ -18,6 +18,7 @@ typedef struct {
     int fd;
     uint16_t width;
     uint16_t height;
+    unsigned int img_addr;  // Image buffer address from device
 } IT8951_USB;
 
 // Initialize USB connection to IT8951
