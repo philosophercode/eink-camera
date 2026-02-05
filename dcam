@@ -1,0 +1,4 @@
+#!/bin/bash
+# Dream Camera launcher
+cd "$(dirname "$0")"
+exec ./venv/bin/python dream_camera.py "${1:-/dev/sg0}"
