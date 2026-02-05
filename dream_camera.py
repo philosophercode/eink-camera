@@ -161,7 +161,7 @@ same pose. Only change the background/environment. Make it look like a real phot
 not artistic or stylized. Professional photography quality."""
 
                 response = self.client.models.generate_content(
-                    model='gemini-2.0-flash-exp-image-generation',
+                    model='nano-banana-pro-preview',
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_modalities=['image', 'text'],
