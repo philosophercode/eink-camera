@@ -27,6 +27,13 @@ import termios
 import tty
 from PIL import Image
 
+# Load .env file automatically
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed, use environment variables directly
+
 # Import our e-ink driver
 from eink import EInkDisplay, MODE_GC16, MODE_A2
 
