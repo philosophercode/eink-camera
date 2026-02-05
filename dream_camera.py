@@ -253,7 +253,29 @@ not artistic or stylized. Professional photography quality."""
 
         return img
 
-    def dream_and_display(self):
+    def make_side_by_side(self, original, dreamed):
+        """Create a side-by-side comparison image."""
+        # Each image gets half the width
+        half_w = self.width // 2
+        h = self.height
+
+        # Resize both images to fit
+        orig_resized = original.convert('L').resize((half_w, h), Image.Resampling.LANCZOS)
+        dream_resized = dreamed.convert('L').resize((half_w, h), Image.Resampling.LANCZOS)
+
+        # Create combined image
+        combined = Image.new('L', (self.width, h), 255)
+        combined.paste(orig_resized, (0, 0))
+        combined.paste(dream_resized, (half_w, 0))
+
+        # Add divider line
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(combined)
+        draw.line([(half_w, 0), (half_w, h)], fill=0, width=3)
+
+        return combined
+
+    def dream_and_display(self, side_by_side=False):
         """Capture, dream, and display."""
         print("Capturing...")
         photo = self.capture_photo()
@@ -264,7 +286,11 @@ not artistic or stylized. Professional photography quality."""
         print(f"  Dream time: {time.time() - start:.1f}s")
 
         print("Displaying...")
-        self.display.show_image(dreamed, mode=MODE_GC16)
+        if side_by_side:
+            combined = self.make_side_by_side(photo, dreamed)
+            self.display.show_image(combined, mode=MODE_GC16)
+        else:
+            self.display.show_image(dreamed, mode=MODE_GC16)
         print("Done!")
 
     def stream_dreams(self):
@@ -307,6 +333,7 @@ not artistic or stylized. Professional photography quality."""
         print(f"Style: {self.style}")
         print("\nControls:")
         print("  1 - Capture and dream")
+        print("  3 - Side-by-side (original + dream)")
         print("  2 - Stream dreams")
         print("  s - Change style")
         print("  c - Clear display")
@@ -326,8 +353,12 @@ not artistic or stylized. Professional photography quality."""
                         break
                     elif key == '1':
                         print("\r")
-                        self.dream_and_display()
+                        self.dream_and_display(side_by_side=False)
                         print("\rReady (press 1 to dream)")
+                    elif key == '3':
+                        print("\r")
+                        self.dream_and_display(side_by_side=True)
+                        print("\rReady (press 3 for side-by-side)")
                     elif key == '2':
                         print("\r")
                         self.stream_dreams()
