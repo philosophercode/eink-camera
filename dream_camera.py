@@ -459,17 +459,24 @@ into the new scene with proper lighting and shadows."""
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("AI Dream Camera")
-        print(f"Usage: sudo python3 {sys.argv[0]} /dev/sgX")
-        print("\nRequires:")
-        print("  pip install google-generativeai pillow")
-        print("  export GOOGLE_API_KEY='your-key'")
-        sys.exit(1)
+    import argparse
+    parser = argparse.ArgumentParser(description='AI Dream Camera')
+    parser.add_argument('device', nargs='?', default='/dev/sg0', help='E-ink device path')
+    parser.add_argument('--once', action='store_true', help='Take one dream photo and exit (no interactive mode)')
+    parser.add_argument('--style', choices=list(DREAM_STYLES.keys()), default=DEFAULT_STYLE, help='Dream style/environment')
+    parser.add_argument('--side-by-side', action='store_true', help='Show original and dream side by side')
+    args = parser.parse_args()
 
-    device = sys.argv[1]
-    camera = DreamCamera(device)
-    camera.run()
+    camera = DreamCamera(args.device)
+    camera.style = args.style
+
+    if args.once:
+        # Non-interactive mode - just take one photo and dream it
+        print(f"Style: {camera.style}")
+        camera.dream_and_display(side_by_side=args.side_by_side)
+        camera.display.close()
+    else:
+        camera.run()
 
 
 if __name__ == '__main__':
