@@ -289,17 +289,17 @@ into the new scene with proper lighting and shadows."""
 
         return combined
 
+    # Spinner size constant
+    SPINNER_SIZE = 120
+
     def get_spinner_region(self, frame):
         """Create a spinning circle indicator."""
         from PIL import ImageDraw
         import math
-
-        # Spinner dimensions
-        self.spinner_size = 120
-        region = Image.new('L', (self.spinner_size, self.spinner_size), 255)
+        region = Image.new('L', (self.SPINNER_SIZE, self.SPINNER_SIZE), 255)
         draw = ImageDraw.Draw(region)
 
-        cx, cy = self.spinner_size // 2, self.spinner_size // 2
+        cx, cy = self.SPINNER_SIZE // 2, self.SPINNER_SIZE // 2
         radius = 40
 
         # Draw circle outline
@@ -327,7 +327,7 @@ into the new scene with proper lighting and shadows."""
         self.display.show_image(photo_gray, mode=MODE_A2)
 
         # Spinner position (top right corner with margin)
-        spinner_x = self.width - self.spinner_size - 30
+        spinner_x = self.width - self.SPINNER_SIZE - 30
         spinner_y = 30
 
         # Start AI processing in background thread
@@ -352,7 +352,7 @@ into the new scene with proper lighting and shadows."""
             # Update just the spinner region (partial refresh)
             spinner = self.get_spinner_region(frame)
             self.display.display(spinner.tobytes(), x=spinner_x, y=spinner_y,
-                                w=self.spinner_size, h=self.spinner_size, mode=MODE_A2)
+                                w=self.SPINNER_SIZE, h=self.SPINNER_SIZE, mode=MODE_A2)
             frame += 1
             time.sleep(0.2)
 
