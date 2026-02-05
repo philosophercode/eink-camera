@@ -154,29 +154,76 @@ class DreamCamera:
     def _fallback_dream(self, image, description):
         """
         Fallback when Imagen isn't available.
-        Apply some basic transformations + text overlay.
+        Apply dramatic artistic transformations.
         """
-        from PIL import ImageFilter, ImageEnhance, ImageDraw, ImageFont
+        from PIL import ImageFilter, ImageEnhance, ImageOps
+        import random
 
-        img = image.copy()
+        img = image.convert('L')  # Grayscale first
 
-        # Apply style-based filters
-        if self.style in ['surreal', 'nightmare', 'dreamy']:
-            img = img.filter(ImageFilter.GaussianBlur(2))
+        # Apply dramatic style-based filters
+        if self.style == 'surreal':
+            # Solarize + emboss for weird dreamlike effect
+            img = ImageOps.solarize(img, threshold=128)
+            img = img.filter(ImageFilter.EMBOSS)
+            img = ImageOps.autocontrast(img)
+
+        elif self.style == 'nightmare':
+            # Invert + find edges + high contrast
+            img = ImageOps.invert(img)
+            img = img.filter(ImageFilter.FIND_EDGES)
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(3.0)
+
+        elif self.style == 'dreamy':
+            # Heavy blur + posterize for soft dream effect
+            img = img.filter(ImageFilter.GaussianBlur(5))
+            img = ImageOps.posterize(img, 3)
             enhancer = ImageEnhance.Contrast(img)
             img = enhancer.enhance(1.5)
-        elif self.style in ['noir', 'sketch']:
+
+        elif self.style == 'noir':
+            # High contrast + edge detection
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(3.0)
+            img = ImageOps.posterize(img, 2)
+
+        elif self.style == 'sketch':
+            # Edge detection + invert for pencil sketch look
+            img = img.filter(ImageFilter.FIND_EDGES)
+            img = ImageOps.invert(img)
             enhancer = ImageEnhance.Contrast(img)
             img = enhancer.enhance(2.0)
-            img = img.filter(ImageFilter.FIND_EDGES)
-        elif self.style == 'vintage':
-            enhancer = ImageEnhance.Color(img)
-            img = enhancer.enhance(0.3)
-        elif self.style == 'minimal':
-            img = img.filter(ImageFilter.CONTOUR)
 
-        # Convert to grayscale for e-ink
-        img = img.convert('L')
+        elif self.style == 'vintage':
+            # Posterize + slight blur for old photo look
+            img = ImageOps.posterize(img, 4)
+            img = img.filter(ImageFilter.SMOOTH)
+
+        elif self.style == 'minimal':
+            # Strong contour for line art
+            img = img.filter(ImageFilter.CONTOUR)
+            img = ImageOps.invert(img)
+            img = ImageOps.autocontrast(img)
+
+        elif self.style == 'cyberpunk':
+            # Emboss + solarize for digital glitch feel
+            img = img.filter(ImageFilter.EMBOSS)
+            img = ImageOps.solarize(img, threshold=100)
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(2.0)
+
+        elif self.style == 'anime':
+            # Posterize heavily for cel-shaded look
+            img = ImageOps.posterize(img, 2)
+            img = img.filter(ImageFilter.EDGE_ENHANCE_MORE)
+
+        elif self.style == 'abstract':
+            # Multiple filters for chaotic effect
+            img = img.filter(ImageFilter.EMBOSS)
+            img = ImageOps.posterize(img, 2)
+            img = img.filter(ImageFilter.FIND_EDGES)
+            img = ImageOps.invert(img)
 
         return img
 
