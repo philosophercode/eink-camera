@@ -289,20 +289,25 @@ into the new scene with proper lighting and shadows."""
 
         return combined
 
-    def add_loading_bar(self, image, progress):
-        """Add a loading bar at the bottom of the image."""
-        from PIL import ImageDraw
-        img = image.copy()
-        draw = ImageDraw.Draw(img)
+    def get_loading_bar_region(self, progress):
+        """Create just the loading bar region image."""
+        from PIL import ImageDraw, ImageFont
 
-        bar_height = 40
-        bar_y = self.height - bar_height - 20
+        # Bar dimensions
+        self.bar_height = 100  # Total region height
+        self.bar_y = self.height - self.bar_height
         bar_margin = 50
+        bar_inner_height = 40
         bar_width = self.width - (bar_margin * 2)
 
+        # Create just the bar region
+        region = Image.new('L', (self.width, self.bar_height), 255)
+        draw = ImageDraw.Draw(region)
+
         # Draw bar background (gray)
+        bar_top = 50
         draw.rectangle(
-            [bar_margin, bar_y, bar_margin + bar_width, bar_y + bar_height],
+            [bar_margin, bar_top, bar_margin + bar_width, bar_top + bar_inner_height],
             fill=200, outline=0, width=3
         )
 
@@ -310,19 +315,26 @@ into the new scene with proper lighting and shadows."""
         progress_width = int(bar_width * progress)
         if progress_width > 0:
             draw.rectangle(
-                [bar_margin + 3, bar_y + 3, bar_margin + 3 + progress_width, bar_y + bar_height - 3],
+                [bar_margin + 3, bar_top + 3, bar_margin + 3 + progress_width, bar_top + bar_inner_height - 3],
                 fill=0
             )
 
         # Add "DREAMING..." text above bar
         try:
-            from PIL import ImageFont
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
         except:
             font = None
-        draw.text((self.width // 2, bar_y - 20), f"DREAMING... {self.style.upper()}",
+        draw.text((self.width // 2, bar_top - 10), f"DREAMING... {self.style.upper()}",
                   anchor="mb", font=font, fill=0)
 
+        return region
+
+    def add_loading_bar(self, image, progress):
+        """Add a loading bar at the bottom of the image (for initial display)."""
+        img = image.copy()
+        bar_region = self.get_loading_bar_region(progress)
+        bar_y = self.height - self.bar_height
+        img.paste(bar_region, (0, bar_y))
         return img
 
     def dream_and_display(self, side_by_side=False):
@@ -349,21 +361,23 @@ into the new scene with proper lighting and shadows."""
         thread = threading.Thread(target=process)
         thread.start()
 
-        # Animate loading bar while waiting
+        # Animate loading bar while waiting (partial refresh only)
         print("Processing with AI...\r")
         start = time.time()
         progress = 0
+        bar_y = self.height - self.bar_height
 
         while thread.is_alive():
             # Increment progress (slow down as it approaches 90%)
             if progress < 0.9:
                 progress += 0.05
 
-            # Update loading bar
-            preview = self.add_loading_bar(photo.convert('L').resize((self.width, self.height)), progress)
-            self.display.show_image(preview, mode=MODE_A2)
+            # Update just the loading bar region (partial refresh)
+            bar_region = self.get_loading_bar_region(progress)
+            self.display.display(bar_region.tobytes(), x=0, y=bar_y,
+                                w=self.width, h=self.bar_height, mode=MODE_A2)
 
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         thread.join()
         print(f"  Dream time: {time.time() - start:.1f}s\r")
