@@ -142,23 +142,24 @@ class DreamCamera:
         description = self.describe_image(image)
         print(f"  Vision: {description[:100]}...")
 
-        # Try to generate new image with Imagen
+        # Try to generate new image with Gemini image generation
         if self.client:
             try:
-                prompt = f"{DREAM_STYLES[self.style]}. Based on: {description}"
-                response = self.client.models.generate_images(
-                    model='imagen-3.0-generate-002',
-                    prompt=prompt,
-                    config=types.GenerateImagesConfig(
-                        number_of_images=1,
-                        aspect_ratio="4:3",
+                prompt = f"{DREAM_STYLES[self.style]}. Based on this scene: {description}"
+                response = self.client.models.generate_content(
+                    model='gemini-2.0-flash-exp-image-generation',
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_modalities=['image', 'text'],
                     )
                 )
-                if response.generated_images:
-                    img_bytes = response.generated_images[0].image.image_bytes
-                    return Image.open(io.BytesIO(img_bytes))
+                # Extract image from response
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'inline_data') and part.inline_data:
+                        img_bytes = part.inline_data.data
+                        return Image.open(io.BytesIO(img_bytes))
             except Exception as e:
-                print(f"  Imagen error: {e}")
+                print(f"  Image generation error: {e}")
 
         # Fallback: apply filters to original
         return self._fallback_dream(image, description)
