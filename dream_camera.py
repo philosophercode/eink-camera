@@ -131,20 +131,21 @@ class DreamCamera:
             )
             return response.text
         except Exception as e:
-            print(f"  Gemini error: {e}")
             return "a person"
 
-    def dream_image(self, image):
+    def dream_image(self, image, quiet=False):
         """
         Place the person from the photo into a new environment.
 
         Returns a new PIL Image with the person in the new background.
         """
-        print(f"  Teleporting to '{self.style}'...")
+        if not quiet:
+            print(f"  Teleporting to '{self.style}'...\r")
 
         # Get detailed description of the person
         person_desc = self.describe_person(image)
-        print(f"  Person: {person_desc[:80]}...")
+        if not quiet:
+            print(f"  Person: {person_desc[:80]}...\r")
 
         background = DREAM_STYLES[self.style]
 
@@ -172,7 +173,8 @@ not artistic or stylized. Professional photography quality."""
                         img_bytes = part.inline_data.data
                         return Image.open(io.BytesIO(img_bytes))
             except Exception as e:
-                print(f"  Image generation error: {e}")
+                if not quiet:
+                    print(f"  Image generation error: {e}\r")
 
         # Fallback: apply filters to original
         return self._fallback_dream(image, description)
@@ -277,25 +279,25 @@ not artistic or stylized. Professional photography quality."""
 
     def dream_and_display(self, side_by_side=False):
         """Capture, dream, and display."""
-        print("Capturing...")
+        print("Capturing...\r")
         photo = self.capture_photo()
 
-        print("Processing with AI...")
+        print("Processing with AI...\r")
         start = time.time()
         dreamed = self.dream_image(photo)
-        print(f"  Dream time: {time.time() - start:.1f}s")
+        print(f"  Dream time: {time.time() - start:.1f}s\r")
 
-        print("Displaying...")
+        print("Displaying...\r")
         if side_by_side:
             combined = self.make_side_by_side(photo, dreamed)
             self.display.show_image(combined, mode=MODE_GC16)
         else:
             self.display.show_image(dreamed, mode=MODE_GC16)
-        print("Done!")
+        print("Done!\r")
 
     def stream_dreams(self):
         """Continuous dream streaming."""
-        print("Streaming dreams (press any key to stop)...")
+        print("Streaming dreams (press any key to stop)...\r")
         frame = 0
         start = time.time()
 
@@ -305,14 +307,15 @@ not artistic or stylized. Professional photography quality."""
                 break
 
             photo = self.capture_photo()
-            dreamed = self.dream_image(photo)
+            dreamed = self.dream_image(photo, quiet=True)
             self.display.show_image(dreamed, mode=MODE_A2)
 
             frame += 1
             elapsed = time.time() - start
-            print(f"\rFrame {frame} ({frame/elapsed:.2f} fps)", end='', flush=True)
+            # Clear line and print status
+            print(f"\r\033[KFrame {frame} ({frame/elapsed:.2f} fps)   ", end='', flush=True)
 
-        print(f"\nStreamed {frame} dreams")
+        print(f"\r\n\033[KStreamed {frame} dreams\r")
 
     def _key_pressed(self):
         """Check if a key was pressed (non-blocking)."""
