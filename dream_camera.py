@@ -106,8 +106,8 @@ class DreamCamera:
         original.convert('RGB').save(orig_path, quality=95)
         dreamed.convert('RGB').save(dream_path, quality=95)
 
-        print(f"  Saved: {orig_path}")
-        print(f"  Saved: {dream_path}")
+        print(f"Saved: {os.path.basename(orig_path)}")
+        print(f"Saved: {os.path.basename(dream_path)}")
         return orig_path, dream_path
 
     def capture_photo(self):
@@ -343,7 +343,7 @@ into the new scene with proper lighting and shadows."""
         """Capture, dream, and display with loading animation."""
         import threading
 
-        print("Capturing...\r")
+        print("\r\nCapturing...")
         photo = self.capture_photo()
 
         # Show photo immediately
@@ -368,7 +368,7 @@ into the new scene with proper lighting and shadows."""
         thread.start()
 
         # Animate spinner while waiting (partial refresh only)
-        print("Processing with AI...\r")
+        print("Processing with AI...")
         start = time.time()
         frame = 0
 
@@ -381,10 +381,10 @@ into the new scene with proper lighting and shadows."""
             time.sleep(0.2)
 
         thread.join()
-        print(f"  Dream time: {time.time() - start:.1f}s\r")
+        print(f"Dream time: {time.time() - start:.1f}s")
 
         if error[0]:
-            print(f"  Error: {error[0]}\r")
+            print(f"Error: {error[0]}")
             return
 
         dreamed = result[0]
@@ -393,13 +393,13 @@ into the new scene with proper lighting and shadows."""
         self.save_images(photo, dreamed)
 
         # Show final result
-        print("Displaying...\r")
+        print("Displaying...")
         if side_by_side:
             combined = self.make_side_by_side(photo, dreamed)
             self.display.show_image(combined, mode=MODE_GC16)
         else:
             self.display.show_image(dreamed, mode=MODE_GC16)
-        print("Done!\r")
+        print("Done!\r\n")
 
     def stream_dreams(self):
         """Continuous dream streaming."""
@@ -477,36 +477,29 @@ into the new scene with proper lighting and shadows."""
                     key = sys.stdin.read(1)
 
                     if key == 'q':
-                        print("\r\nQuitting...")
+                        print("\r\nQuitting...\r\n")
                         break
                     elif key == '1':
-                        print("\r")
                         self.dream_and_display(side_by_side=False)
-                        print("\rReady (press 1 to dream)")
                     elif key == '3':
-                        print("\r")
                         self.dream_and_display(side_by_side=True)
-                        print("\rReady (press 3 for side-by-side)")
                     elif key == '2':
-                        print("\r")
                         self.stream_dreams()
-                        print("\rReady")
                     elif key == 's':
-                        print("\r")
+                        print("\r\n")
                         self.cycle_style()
+                        print("")
                     elif key == 'c':
-                        print("\rClearing...")
+                        print("\r\nClearing...\r\n")
                         self.display.clear()
-                        print("\rReady")
 
                 # Check GPIO button
                 if gpio_chip is not None:
                     import lgpio
                     state = lgpio.gpio_read(gpio_chip, gpio_pin)
                     if last_button_state == 1 and state == 0:
-                        print("\r[Button pressed!]")
+                        print("\r\n[Button pressed!]")
                         self.dream_and_display(side_by_side=False)
-                        print("\rReady")
                     last_button_state = state
 
         finally:
