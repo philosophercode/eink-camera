@@ -458,11 +458,55 @@ into the new scene with proper lighting and shadows."""
             self.display.close()
 
 
+def run_button_mode(camera, gpio_pin=17, side_by_side=False):
+    """Run in physical button mode - press button to capture and dream."""
+    import lgpio
+
+    print(f"\n=== BUTTON MODE ===")
+    print(f"GPIO pin: {gpio_pin} (connect red wire)")
+    print(f"Style: {camera.style}")
+    print("Press the button to capture and dream!")
+    print("Ctrl+C to quit\n")
+
+    # Open GPIO chip (Pi 5 uses gpiochip4)
+    try:
+        chip = lgpio.gpiochip_open(4)  # Pi 5
+    except:
+        chip = lgpio.gpiochip_open(0)  # Older Pi
+
+    # Set up pin as input with pull-up resistor
+    lgpio.gpio_claim_input(chip, gpio_pin, lgpio.SET_PULL_UP)
+
+    shot_count = 0
+    last_state = 1  # Pull-up means high when not pressed
+
+    try:
+        while True:
+            state = lgpio.gpio_read(chip, gpio_pin)
+
+            # Button pressed (falling edge: was high, now low)
+            if last_state == 1 and state == 0:
+                shot_count += 1
+                print(f"\n[Shot {shot_count}] Button pressed!")
+                camera.dream_and_display(side_by_side=side_by_side)
+                print("Ready for next shot...")
+
+            last_state = state
+            time.sleep(0.05)  # 50ms debounce
+
+    except KeyboardInterrupt:
+        print(f"\n\nExiting. Took {shot_count} dream shots.")
+    finally:
+        lgpio.gpiochip_close(chip)
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='AI Dream Camera')
     parser.add_argument('device', nargs='?', default='/dev/sg0', help='E-ink device path')
     parser.add_argument('--once', action='store_true', help='Take one dream photo and exit (no interactive mode)')
+    parser.add_argument('--button', action='store_true', help='Physical button mode - press button to capture')
+    parser.add_argument('--gpio', type=int, default=17, help='GPIO pin for button (default: 17)')
     parser.add_argument('--style', choices=list(DREAM_STYLES.keys()), default=DEFAULT_STYLE, help='Dream style/environment')
     parser.add_argument('--side-by-side', action='store_true', help='Show original and dream side by side')
     args = parser.parse_args()
@@ -474,6 +518,10 @@ def main():
         # Non-interactive mode - just take one photo and dream it
         print(f"Style: {camera.style}")
         camera.dream_and_display(side_by_side=args.side_by_side)
+        camera.display.close()
+    elif args.button:
+        # Physical button mode
+        run_button_mode(camera, gpio_pin=args.gpio, side_by_side=args.side_by_side)
         camera.display.close()
     else:
         camera.run()
