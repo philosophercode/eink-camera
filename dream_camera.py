@@ -106,8 +106,8 @@ class DreamCamera:
         original.convert('RGB').save(orig_path, quality=95)
         dreamed.convert('RGB').save(dream_path, quality=95)
 
-        print(f"Saved: {os.path.basename(orig_path)}")
-        print(f"Saved: {os.path.basename(dream_path)}")
+        print(f"\rSaved: {os.path.basename(orig_path)}", flush=True)
+        print(f"\rSaved: {os.path.basename(dream_path)}", flush=True)
         return orig_path, dream_path
 
     def capture_photo(self):
@@ -343,7 +343,7 @@ into the new scene with proper lighting and shadows."""
         """Capture, dream, and display with loading animation."""
         import threading
 
-        print("\r\nCapturing...")
+        print("\r\nCapturing...", flush=True)
         photo = self.capture_photo()
 
         # Show photo immediately
@@ -368,7 +368,7 @@ into the new scene with proper lighting and shadows."""
         thread.start()
 
         # Animate spinner while waiting (partial refresh only)
-        print("Processing with AI...")
+        print("\rProcessing with AI...", flush=True)
         start = time.time()
         frame = 0
 
@@ -381,10 +381,10 @@ into the new scene with proper lighting and shadows."""
             time.sleep(0.2)
 
         thread.join()
-        print(f"Dream time: {time.time() - start:.1f}s")
+        print(f"\rDream time: {time.time() - start:.1f}s", flush=True)
 
         if error[0]:
-            print(f"Error: {error[0]}")
+            print(f"\rError: {error[0]}", flush=True)
             return
 
         dreamed = result[0]
@@ -393,13 +393,13 @@ into the new scene with proper lighting and shadows."""
         self.save_images(photo, dreamed)
 
         # Show final result
-        print("Displaying...")
+        print("\rDisplaying...", flush=True)
         if side_by_side:
             combined = self.make_side_by_side(photo, dreamed)
             self.display.show_image(combined, mode=MODE_GC16)
         else:
             self.display.show_image(dreamed, mode=MODE_GC16)
-        print("Done!\r\n")
+        print("\rDone!\r\n", flush=True)
 
     def stream_dreams(self):
         """Continuous dream streaming."""
