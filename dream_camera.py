@@ -35,7 +35,7 @@ except ImportError:
     pass  # dotenv not installed, use environment variables directly
 
 # Import our e-ink driver
-from eink import EInkDisplay, MODE_GC16, MODE_A2
+from eink import EInkDisplay, MODE_GC16, MODE_A2, MODE_INIT
 
 # Google AI imports (new google-genai package)
 try:
@@ -87,6 +87,7 @@ class DreamCamera:
         self.height = self.display.height
         self.save_dir = save_dir
         self.last_image = None  # Store last displayed image
+        self.capture_count = 0  # Track captures for auto-reset
 
         # Create save directory if specified
         if self.save_dir:
@@ -421,7 +422,15 @@ into the new scene with proper lighting and shadows."""
 
         self.display.show_image(final_image, mode=MODE_GC16)
         self.last_image = final_image  # Store for style banner restore
+        self.capture_count += 1
         print("\rDone!\r\n", flush=True)
+
+        # Auto-reset every 10 captures to prevent freezing
+        if self.capture_count % 10 == 0:
+            print("\r[Auto-reset to prevent freeze]\r\n", flush=True)
+            self.display.reset()
+            if self.last_image:
+                self.display.show_image(self.last_image, mode=MODE_GC16)
 
     def stream_dreams(self):
         """Continuous dream streaming."""
@@ -498,6 +507,7 @@ into the new scene with proper lighting and shadows."""
         print("  3 - Side-by-side")
         print("  2 - Stream")
         print("  c - Clear")
+        print("  r - Reset display (if frozen)")
         print("  q - Quit")
 
         # Set up GPIO button if specified
@@ -546,6 +556,10 @@ into the new scene with proper lighting and shadows."""
                     elif key == 'c':
                         print("\r\nClearing...\r\n", flush=True)
                         self.display.clear()
+                        print("\rDone!\r\n", flush=True)
+                    elif key == 'r':
+                        print("\r\nResetting display...\r\n", flush=True)
+                        self.display.reset()
                         print("\rDone!\r\n", flush=True)
 
                 # Check GPIO button with style mode

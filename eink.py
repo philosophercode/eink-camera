@@ -318,6 +318,23 @@ class EInkDisplay:
         white = bytes([0xFF] * (self.width * self.height))
         self.display(white, mode=mode)
 
+    def reset(self):
+        """Reset connection to display (fixes freezes)."""
+        device = f"/proc/self/fd/{self.fd}"
+        # Get the actual device path
+        try:
+            device = os.readlink(device)
+        except:
+            device = '/dev/sg0'
+
+        # Close and reopen
+        os.close(self.fd)
+        self.fd = os.open(device, os.O_RDWR | os.O_NONBLOCK)
+        self._get_device_info()
+        # Do a full clear to reset the controller
+        self.clear(MODE_INIT)
+        print("Display reset!")
+
     def close(self):
         """Close connection."""
         os.close(self.fd)
