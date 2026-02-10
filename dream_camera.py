@@ -435,18 +435,36 @@ into the new scene with proper lighting and shadows."""
         print(f"Style: {self.style}")
         print(f"  {DREAM_STYLES[self.style][:60]}...")
 
-    def run(self):
-        """Main interactive loop."""
+    def run(self, gpio_pin=None):
+        """Main interactive loop with optional GPIO button support."""
         print("\n=== AI Dream Camera ===")
         print(f"Display: {self.width}x{self.height}")
         print(f"Style: {self.style}")
         print("\nControls:")
-        print("  1 - Capture and dream")
+        print("  1 / BUTTON - Capture and dream")
         print("  3 - Side-by-side (original + dream)")
         print("  2 - Stream dreams")
         print("  s - Change style")
         print("  c - Clear display")
-        print("  q - Quit\n")
+        print("  q - Quit")
+
+        # Set up GPIO button if specified
+        gpio_chip = None
+        last_button_state = 1
+        if gpio_pin is not None:
+            try:
+                import lgpio
+                try:
+                    gpio_chip = lgpio.gpiochip_open(4)  # Pi 5
+                except:
+                    gpio_chip = lgpio.gpiochip_open(0)  # Older Pi
+                lgpio.gpio_claim_input(gpio_chip, gpio_pin, lgpio.SET_PULL_UP)
+                print(f"  Button on GPIO{gpio_pin} ready!")
+            except Exception as e:
+                print(f"  GPIO setup failed: {e}")
+                gpio_chip = None
+
+        print("")
 
         # Set terminal to raw mode
         old_settings = termios.tcgetattr(sys.stdin)
@@ -454,7 +472,8 @@ into the new scene with proper lighting and shadows."""
             tty.setraw(sys.stdin.fileno())
 
             while True:
-                if select.select([sys.stdin], [], [], 0.1)[0]:
+                # Check keyboard
+                if select.select([sys.stdin], [], [], 0.05)[0]:
                     key = sys.stdin.read(1)
 
                     if key == 'q':
@@ -480,8 +499,21 @@ into the new scene with proper lighting and shadows."""
                         self.display.clear()
                         print("\rReady")
 
+                # Check GPIO button
+                if gpio_chip is not None:
+                    import lgpio
+                    state = lgpio.gpio_read(gpio_chip, gpio_pin)
+                    if last_button_state == 1 and state == 0:
+                        print("\r[Button pressed!]")
+                        self.dream_and_display(side_by_side=False)
+                        print("\rReady")
+                    last_button_state = state
+
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+            if gpio_chip is not None:
+                import lgpio
+                lgpio.gpiochip_close(gpio_chip)
             self.display.close()
 
 
@@ -551,12 +583,10 @@ def main():
         print(f"Style: {camera.style}")
         camera.dream_and_display(side_by_side=args.side_by_side)
         camera.display.close()
-    elif args.button:
-        # Physical button mode
-        run_button_mode(camera, gpio_pin=args.gpio, side_by_side=args.side_by_side)
-        camera.display.close()
     else:
-        camera.run()
+        # Interactive mode - keyboard + optional button
+        gpio_pin = args.gpio if args.button else None
+        camera.run(gpio_pin=gpio_pin)
 
 
 if __name__ == '__main__':
