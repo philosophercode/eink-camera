@@ -536,11 +536,12 @@ def main():
     parser.add_argument('--gpio', type=int, default=17, help='GPIO pin for button (default: 17)')
     parser.add_argument('--style', choices=list(DREAM_STYLES.keys()), default=DEFAULT_STYLE, help='Dream style/environment')
     parser.add_argument('--side-by-side', action='store_true', help='Show original and dream side by side')
-    parser.add_argument('--save', metavar='DIR', help='Save images to directory (e.g., ~/dreams)')
+    parser.add_argument('--save', metavar='DIR', default='~/dreams', help='Save images to directory (default: ~/dreams)')
+    parser.add_argument('--no-save', action='store_true', help='Disable auto-saving images')
     args = parser.parse_args()
 
     # Expand ~ in save path
-    save_dir = os.path.expanduser(args.save) if args.save else None
+    save_dir = None if args.no_save else os.path.expanduser(args.save)
 
     camera = DreamCamera(args.device, save_dir=save_dir)
     camera.style = args.style
