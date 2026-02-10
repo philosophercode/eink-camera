@@ -106,8 +106,8 @@ class DreamCamera:
         original.convert('RGB').save(orig_path, quality=95)
         dreamed.convert('RGB').save(dream_path, quality=95)
 
-        print(f"\rSaved: {os.path.basename(orig_path)}", flush=True)
-        print(f"\rSaved: {os.path.basename(dream_path)}", flush=True)
+        print(f"\rSaved: {os.path.basename(orig_path)}\r\n", flush=True)
+        print(f"\rSaved: {os.path.basename(dream_path)}\r\n", flush=True)
         return orig_path, dream_path
 
     def capture_photo(self):
@@ -343,7 +343,7 @@ into the new scene with proper lighting and shadows."""
         """Capture, dream, and display with loading animation."""
         import threading
 
-        print("\r\nCapturing...", flush=True)
+        print("\rCapturing...\r\n", flush=True)
         photo = self.capture_photo()
 
         # Show photo immediately
@@ -368,7 +368,7 @@ into the new scene with proper lighting and shadows."""
         thread.start()
 
         # Animate spinner while waiting (partial refresh only)
-        print("\rProcessing with AI...", flush=True)
+        print("\rProcessing with AI...\r\n", flush=True)
         start = time.time()
         frame = 0
 
@@ -381,10 +381,10 @@ into the new scene with proper lighting and shadows."""
             time.sleep(0.2)
 
         thread.join()
-        print(f"\rDream time: {time.time() - start:.1f}s", flush=True)
+        print(f"\rDream time: {time.time() - start:.1f}s\r\n", flush=True)
 
         if error[0]:
-            print(f"\rError: {error[0]}", flush=True)
+            print(f"\rError: {error[0]}\r\n", flush=True)
             return
 
         dreamed = result[0]
@@ -393,7 +393,7 @@ into the new scene with proper lighting and shadows."""
         self.save_images(photo, dreamed)
 
         # Show final result
-        print("\rDisplaying...", flush=True)
+        print("\rDisplaying...\r\n", flush=True)
         if side_by_side:
             combined = self.make_side_by_side(photo, dreamed)
             self.display.show_image(combined, mode=MODE_GC16)
@@ -432,8 +432,7 @@ into the new scene with proper lighting and shadows."""
         styles = list(DREAM_STYLES.keys())
         idx = styles.index(self.style)
         self.style = styles[(idx + 1) % len(styles)]
-        print(f"Style: {self.style}")
-        print(f"  {DREAM_STYLES[self.style][:60]}...")
+        print(f"\rStyle: {self.style}\r\n\r  {DREAM_STYLES[self.style][:50]}...\r\n", flush=True)
 
     def run(self, gpio_pin=None):
         """Main interactive loop with optional GPIO button support."""
@@ -486,19 +485,18 @@ into the new scene with proper lighting and shadows."""
                     elif key == '2':
                         self.stream_dreams()
                     elif key == 's':
-                        print("\r\n")
                         self.cycle_style()
-                        print("")
                     elif key == 'c':
-                        print("\r\nClearing...\r\n")
+                        print("\r\nClearing...\r\n", flush=True)
                         self.display.clear()
+                        print("\rDone!\r\n", flush=True)
 
                 # Check GPIO button
                 if gpio_chip is not None:
                     import lgpio
                     state = lgpio.gpio_read(gpio_chip, gpio_pin)
                     if last_button_state == 1 and state == 0:
-                        print("\r\n[Button pressed!]")
+                        print("\r\n[Button pressed!]\r\n", flush=True)
                         self.dream_and_display(side_by_side=False)
                     last_button_state = state
 
