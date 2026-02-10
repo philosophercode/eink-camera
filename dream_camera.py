@@ -68,11 +68,17 @@ DEFAULT_STYLE = 'jungle'
 class DreamCamera:
     """AI-powered camera that reimagines what it sees."""
 
-    def __init__(self, device='/dev/sg0', api_key=None):
+    def __init__(self, device='/dev/sg0', api_key=None, save_dir=None):
         self.display = EInkDisplay(device)
         self.style = DEFAULT_STYLE
         self.width = self.display.width
         self.height = self.display.height
+        self.save_dir = save_dir
+
+        # Create save directory if specified
+        if self.save_dir:
+            os.makedirs(self.save_dir, exist_ok=True)
+            print(f"Saving images to: {self.save_dir}")
 
         # Initialize Gemini
         self.client = None
@@ -85,6 +91,24 @@ class DreamCamera:
                 print("Warning: No GOOGLE_API_KEY set")
         else:
             print("Warning: google-genai not installed")
+
+    def save_images(self, original, dreamed):
+        """Save original and dreamed images with timestamp."""
+        if not self.save_dir:
+            return None, None
+
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+        orig_path = os.path.join(self.save_dir, f"{timestamp}_original.jpg")
+        dream_path = os.path.join(self.save_dir, f"{timestamp}_{self.style}.jpg")
+
+        original.convert('RGB').save(orig_path, quality=95)
+        dreamed.convert('RGB').save(dream_path, quality=95)
+
+        print(f"  Saved: {orig_path}")
+        print(f"  Saved: {dream_path}")
+        return orig_path, dream_path
 
     def capture_photo(self):
         """Capture a photo using libcamera."""
@@ -365,6 +389,9 @@ into the new scene with proper lighting and shadows."""
 
         dreamed = result[0]
 
+        # Save images if save_dir is set
+        self.save_images(photo, dreamed)
+
         # Show final result
         print("Displaying...\r")
         if side_by_side:
@@ -509,9 +536,13 @@ def main():
     parser.add_argument('--gpio', type=int, default=17, help='GPIO pin for button (default: 17)')
     parser.add_argument('--style', choices=list(DREAM_STYLES.keys()), default=DEFAULT_STYLE, help='Dream style/environment')
     parser.add_argument('--side-by-side', action='store_true', help='Show original and dream side by side')
+    parser.add_argument('--save', metavar='DIR', help='Save images to directory (e.g., ~/dreams)')
     args = parser.parse_args()
 
-    camera = DreamCamera(args.device)
+    # Expand ~ in save path
+    save_dir = os.path.expanduser(args.save) if args.save else None
+
+    camera = DreamCamera(args.device, save_dir=save_dir)
     camera.style = args.style
 
     if args.once:
