@@ -48,8 +48,9 @@ except ImportError:
     print("Install with: pip install google-genai pillow")
 
 
-# Environment backgrounds - photorealistic, keeps the person the same
+# Dream styles - environments and art styles
 DREAM_STYLES = {
+    # Environments - change the background
     'jungle': "dense tropical rainforest with lush green foliage, exotic plants, hanging vines, dappled sunlight through the canopy",
     'underwater': "deep ocean scene with blue water, coral reefs, tropical fish swimming around, light rays from above, bubbles",
     'city': "Times Square New York City at night with bright neon signs, yellow taxis, crowds of people, urban energy",
@@ -60,6 +61,17 @@ DREAM_STYLES = {
     'tokyo': "neon-lit Tokyo street at night, Japanese signs, rain-slicked streets, cyberpunk atmosphere",
     'safari': "African savanna at golden hour, acacia trees, distant elephants, dramatic sky, wild adventure",
     'castle': "inside a grand medieval castle, stone walls, torches, red banners, dramatic lighting",
+    # Art styles - transform the image style
+    'clay': "transform into a claymation character like Wallace and Gromit, smooth clay texture, stop-motion animation style, handcrafted look",
+    'pencil': "detailed pencil sketch drawing, fine graphite lines, subtle shading, artist sketchbook style, hand-drawn",
+    'sharpie': "bold black sharpie marker drawing, thick confident lines, high contrast, minimal detail, street art style",
+    'lineart': "clean line art illustration, precise outlines, no shading, coloring book style, vector-like",
+    'charcoal': "expressive charcoal drawing, smudged edges, dramatic shadows, fine art style, textured paper",
+    'watercolor': "soft watercolor painting, flowing colors bleeding together, wet on wet technique, artistic",
+    'comic': "comic book style, bold outlines, halftone dots, pop art colors, superhero illustration",
+    'pixel': "retro pixel art, 16-bit video game style, blocky pixels, nostalgic gaming aesthetic",
+    'sculpture': "classical marble sculpture, ancient Greek/Roman statue, carved stone, museum quality",
+    'woodcut': "traditional woodblock print, bold black lines, vintage illustration style, old book aesthetic",
 }
 
 DEFAULT_STYLE = 'jungle'
@@ -158,21 +170,20 @@ class DreamCamera:
         except Exception as e:
             return "a person"
 
+    # Art styles that transform the whole image (vs environment styles that change background)
+    ART_STYLES = {'clay', 'pencil', 'sharpie', 'lineart', 'charcoal', 'watercolor', 'comic', 'pixel', 'sculpture', 'woodcut'}
+
     def dream_image(self, image, quiet=False):
         """
-        Place the person from the photo into a new environment.
+        Transform the photo - either new environment or art style.
 
-        Returns a new PIL Image with the person in the new background.
+        Returns a new PIL Image.
         """
         if not quiet:
-            print(f"  Teleporting to '{self.style}'...\r")
+            print(f"  Dreaming '{self.style}'...\r")
 
-        # Get detailed description of the person
-        person_desc = self.describe_person(image)
-        if not quiet:
-            print(f"  Person: {person_desc}\r")
-
-        background = DREAM_STYLES[self.style]
+        style_desc = DREAM_STYLES[self.style]
+        is_art_style = self.style in self.ART_STYLES
 
         # Try to generate new image with Gemini image generation
         if self.client:
@@ -182,7 +193,15 @@ class DreamCamera:
                 image.save(buf, format='JPEG')
                 image_bytes = buf.getvalue()
 
-                prompt = f"""Take this photo and place the person into a new environment: {background}
+                if is_art_style:
+                    # Art style - transform the entire image
+                    prompt = f"""Transform this photo into: {style_desc}
+
+Keep the same composition, pose, and subject but completely change the artistic style.
+Make it look like an authentic piece in this style, not a filter."""
+                else:
+                    # Environment style - change the background
+                    prompt = f"""Take this photo and place the person into a new environment: {style_desc}
 
 Keep the person looking EXACTLY the same - same face, same clothes, same pose, same expression.
 Only change the background/environment around them. Make it look like a real photograph,
