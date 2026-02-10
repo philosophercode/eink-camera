@@ -564,8 +564,8 @@ def main():
     parser = argparse.ArgumentParser(description='AI Dream Camera')
     parser.add_argument('device', nargs='?', default='/dev/sg0', help='E-ink device path')
     parser.add_argument('--once', action='store_true', help='Take one dream photo and exit (no interactive mode)')
-    parser.add_argument('--button', action='store_true', help='Physical button mode - press button to capture')
     parser.add_argument('--gpio', type=int, default=17, help='GPIO pin for button (default: 17)')
+    parser.add_argument('--no-button', action='store_true', help='Disable physical button')
     parser.add_argument('--style', choices=list(DREAM_STYLES.keys()), default=DEFAULT_STYLE, help='Dream style/environment')
     parser.add_argument('--side-by-side', action='store_true', help='Show original and dream side by side')
     parser.add_argument('--save', metavar='DIR', default='~/dreams', help='Save images to directory (default: ~/dreams)')
@@ -584,8 +584,8 @@ def main():
         camera.dream_and_display(side_by_side=args.side_by_side)
         camera.display.close()
     else:
-        # Interactive mode - keyboard + optional button
-        gpio_pin = args.gpio if args.button else None
+        # Interactive mode - keyboard + button (button enabled by default)
+        gpio_pin = None if args.no_button else args.gpio
         camera.run(gpio_pin=gpio_pin)
 
 
