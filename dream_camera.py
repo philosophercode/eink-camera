@@ -74,6 +74,7 @@ class DreamCamera:
         self.width = self.display.width
         self.height = self.display.height
         self.save_dir = save_dir
+        self.last_image = None  # Store last displayed image
 
         # Create save directory if specified
         if self.save_dir:
@@ -395,10 +396,12 @@ into the new scene with proper lighting and shadows."""
         # Show final result
         print("\rDisplaying...\r\n", flush=True)
         if side_by_side:
-            combined = self.make_side_by_side(photo, dreamed)
-            self.display.show_image(combined, mode=MODE_GC16)
+            final_image = self.make_side_by_side(photo, dreamed)
         else:
-            self.display.show_image(dreamed, mode=MODE_GC16)
+            final_image = dreamed.convert('L').resize((self.width, self.height), Image.Resampling.LANCZOS)
+
+        self.display.show_image(final_image, mode=MODE_GC16)
+        self.last_image = final_image  # Store for style banner restore
         print("\rDone!\r\n", flush=True)
 
     def stream_dreams(self):
@@ -427,12 +430,47 @@ into the new scene with proper lighting and shadows."""
         """Check if a key was pressed (non-blocking)."""
         return select.select([sys.stdin], [], [], 0)[0]
 
-    def cycle_style(self):
+    def show_style_banner(self):
+        """Show current style as banner on display, then restore last image."""
+        from PIL import ImageDraw, ImageFont
+
+        # Create banner image
+        img = Image.new('L', (self.width, self.height), 255)
+        draw = ImageDraw.Draw(img)
+
+        # Try to load fonts
+        try:
+            font_big = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", 120)
+            font_small = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSans.ttf", 48)
+        except:
+            font_big = font_small = None
+
+        # Style name
+        style_name = self.style.upper()
+        draw.text((self.width // 2, self.height // 2 - 50),
+                  f"▶ {style_name} ◀", anchor="mm", font=font_big, fill=0)
+
+        # Description
+        desc = DREAM_STYLES[self.style][:60] + "..."
+        draw.text((self.width // 2, self.height // 2 + 80),
+                  desc, anchor="mm", font=font_small, fill=80)
+
+        # Show banner with fast refresh
+        self.display.show_image(img, mode=MODE_A2)
+
+        # Wait a moment, then restore last image if available
+        time.sleep(1.5)
+        if self.last_image:
+            self.display.show_image(self.last_image, mode=MODE_A2)
+
+    def cycle_style(self, show_banner=False):
         """Cycle through dream styles."""
         styles = list(DREAM_STYLES.keys())
         idx = styles.index(self.style)
         self.style = styles[(idx + 1) % len(styles)]
         print(f"\rStyle: {self.style}\r\n\r  {DREAM_STYLES[self.style][:50]}...\r\n", flush=True)
+        if show_banner:
+            self.show_style_banner()
 
     def run(self, gpio_pin=None):
         """Main interactive loop with optional GPIO button support."""
@@ -440,16 +478,17 @@ into the new scene with proper lighting and shadows."""
         print(f"Display: {self.width}x{self.height}")
         print(f"Style: {self.style}")
         print("\nControls:")
-        print("  1 / BUTTON - Capture and dream")
+        print("  1 / short press  - Capture and dream")
+        print("  s / long press   - Change style")
         print("  3 - Side-by-side (original + dream)")
         print("  2 - Stream dreams")
-        print("  s - Change style")
         print("  c - Clear display")
         print("  q - Quit")
 
         # Set up GPIO button if specified
         gpio_chip = None
         last_button_state = 1
+        button_press_time = 0
         if gpio_pin is not None:
             try:
                 import lgpio
@@ -491,13 +530,27 @@ into the new scene with proper lighting and shadows."""
                         self.display.clear()
                         print("\rDone!\r\n", flush=True)
 
-                # Check GPIO button
+                # Check GPIO button with long-press detection
                 if gpio_chip is not None:
                     import lgpio
                     state = lgpio.gpio_read(gpio_chip, gpio_pin)
+
+                    # Button just pressed - start timing
                     if last_button_state == 1 and state == 0:
-                        print("\r\n[Button pressed!]\r\n", flush=True)
-                        self.dream_and_display(side_by_side=False)
+                        button_press_time = time.time()
+
+                    # Button just released - check duration
+                    elif last_button_state == 0 and state == 1:
+                        press_duration = time.time() - button_press_time
+                        if press_duration >= 1.5:
+                            # Long press = cycle style
+                            print("\r\n[Style change]\r\n", flush=True)
+                            self.cycle_style(show_banner=True)
+                        else:
+                            # Short press = capture
+                            print("\r\n[Capture]\r\n", flush=True)
+                            self.dream_and_display(side_by_side=False)
+
                     last_button_state = state
 
         finally:
