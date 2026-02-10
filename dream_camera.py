@@ -673,11 +673,11 @@ def main():
     parser.add_argument('--no-button', action='store_true', help='Disable physical button')
     parser.add_argument('--style', choices=list(DREAM_STYLES.keys()), default=DEFAULT_STYLE, help='Dream style/environment')
     parser.add_argument('--side-by-side', action='store_true', help='Show original and dream side by side')
-    parser.add_argument('--save', metavar='DIR', default='~/dreams', help='Save images to directory (default: ~/dreams)')
+    parser.add_argument('--save', metavar='DIR', default='./dreams', help='Save images to directory (default: ./dreams)')
     parser.add_argument('--no-save', action='store_true', help='Disable auto-saving images')
     args = parser.parse_args()
 
-    # Expand ~ in save path (use actual user's home when running with sudo)
+    # Expand save path (handle ~, relative paths, and sudo)
     if args.no_save:
         save_dir = None
     else:
@@ -687,8 +687,12 @@ def main():
             import pwd
             real_home = pwd.getpwnam(os.environ['SUDO_USER']).pw_dir
             save_path = save_path.replace('~', real_home, 1)
-        else:
+        elif save_path.startswith('~'):
             save_path = os.path.expanduser(save_path)
+        elif not save_path.startswith('/'):
+            # Relative path - make it relative to script directory
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            save_path = os.path.join(script_dir, save_path)
         save_dir = save_path
 
     camera = DreamCamera(args.device, save_dir=save_dir)
