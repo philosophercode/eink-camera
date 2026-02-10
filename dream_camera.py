@@ -448,7 +448,7 @@ into the new scene with proper lighting and shadows."""
         # Style name
         style_name = self.style.upper()
         draw.text((self.width // 2, self.height // 2 - 50),
-                  f"▶ {style_name} ◀", anchor="mm", font=font_big, fill=0)
+                  f"[ {style_name} ]", anchor="mm", font=font_big, fill=0)
 
         # Description
         desc = DREAM_STYLES[self.style][:60] + "..."
