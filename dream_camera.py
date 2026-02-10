@@ -677,8 +677,19 @@ def main():
     parser.add_argument('--no-save', action='store_true', help='Disable auto-saving images')
     args = parser.parse_args()
 
-    # Expand ~ in save path
-    save_dir = None if args.no_save else os.path.expanduser(args.save)
+    # Expand ~ in save path (use actual user's home when running with sudo)
+    if args.no_save:
+        save_dir = None
+    else:
+        save_path = args.save
+        if save_path.startswith('~') and os.environ.get('SUDO_USER'):
+            # Running with sudo - use the original user's home
+            import pwd
+            real_home = pwd.getpwnam(os.environ['SUDO_USER']).pw_dir
+            save_path = save_path.replace('~', real_home, 1)
+        else:
+            save_path = os.path.expanduser(save_path)
+        save_dir = save_path
 
     camera = DreamCamera(args.device, save_dir=save_dir)
     camera.style = args.style
