@@ -458,11 +458,6 @@ into the new scene with proper lighting and shadows."""
         # Show banner with fast refresh
         self.display.show_image(img, mode=MODE_A2)
 
-        # Wait a moment, then restore last image if available
-        time.sleep(1.5)
-        if self.last_image:
-            self.display.show_image(self.last_image, mode=MODE_A2)
-
     def cycle_style(self, show_banner=False):
         """Cycle through dream styles."""
         styles = list(DREAM_STYLES.keys())
@@ -479,16 +474,20 @@ into the new scene with proper lighting and shadows."""
         print(f"Style: {self.style}")
         print("\nControls:")
         print("  1 / short press  - Capture and dream")
-        print("  s / long press   - Change style")
-        print("  3 - Side-by-side (original + dream)")
-        print("  2 - Stream dreams")
-        print("  c - Clear display")
+        print("  s / hold 1.5s    - Enter style mode")
+        print("      (press to cycle, double-click or wait to confirm)")
+        print("  3 - Side-by-side")
+        print("  2 - Stream")
+        print("  c - Clear")
         print("  q - Quit")
 
         # Set up GPIO button if specified
         gpio_chip = None
         last_button_state = 1
         button_press_time = 0
+        style_mode = False
+        style_mode_start = 0
+        last_style_press = 0
         if gpio_pin is not None:
             try:
                 import lgpio
@@ -530,26 +529,55 @@ into the new scene with proper lighting and shadows."""
                         self.display.clear()
                         print("\rDone!\r\n", flush=True)
 
-                # Check GPIO button with long-press detection
+                # Check GPIO button with style mode
                 if gpio_chip is not None:
                     import lgpio
                     state = lgpio.gpio_read(gpio_chip, gpio_pin)
+                    now = time.time()
 
-                    # Button just pressed - start timing
-                    if last_button_state == 1 and state == 0:
-                        button_press_time = time.time()
+                    if not style_mode:
+                        # Normal mode
+                        if last_button_state == 1 and state == 0:
+                            # Button pressed - start timing
+                            button_press_time = now
 
-                    # Button just released - check duration
-                    elif last_button_state == 0 and state == 1:
-                        press_duration = time.time() - button_press_time
-                        if press_duration >= 1.5:
-                            # Long press = cycle style
-                            print("\r\n[Style change]\r\n", flush=True)
-                            self.cycle_style(show_banner=True)
-                        else:
-                            # Short press = capture
-                            print("\r\n[Capture]\r\n", flush=True)
-                            self.dream_and_display(side_by_side=False)
+                        elif last_button_state == 0 and state == 0:
+                            # Button still held - check for long press
+                            if now - button_press_time >= 1.5 and not style_mode:
+                                # Enter style mode
+                                style_mode = True
+                                style_mode_start = now
+                                last_style_press = now
+                                print("\r\n[Style Mode]\r\n", flush=True)
+                                self.show_style_banner()
+
+                        elif last_button_state == 0 and state == 1:
+                            # Button released - short press = capture
+                            if now - button_press_time < 1.5:
+                                print("\r\n[Capture]\r\n", flush=True)
+                                self.dream_and_display(side_by_side=False)
+
+                    else:
+                        # Style mode - each press cycles, timeout or double-click exits
+                        if last_button_state == 1 and state == 0:
+                            # Button pressed in style mode
+                            if now - last_style_press < 0.4:
+                                # Double click - exit style mode
+                                print("\r\n[Style confirmed]\r\n", flush=True)
+                                style_mode = False
+                                if self.last_image:
+                                    self.display.show_image(self.last_image, mode=MODE_A2)
+                            else:
+                                # Single press - cycle style
+                                self.cycle_style(show_banner=True)
+                                last_style_press = now
+
+                        # Timeout - exit style mode after 3 seconds of no input
+                        if now - last_style_press > 3.0:
+                            print("\r\n[Style confirmed]\r\n", flush=True)
+                            style_mode = False
+                            if self.last_image:
+                                self.display.show_image(self.last_image, mode=MODE_A2)
 
                     last_button_state = state
 
