@@ -483,9 +483,12 @@ into the new scene with proper lighting and shadows."""
 
         print(f"\r\n[Gallery: {total} dreams]\r\n", end='', flush=True)
         show_current()
+        last_advance = time.time()
 
         last_btn = 1
         btn_time = 0
+        gal_click_count = 0
+        last_gal_click = 0
 
         while True:
             if select.select([sys.stdin], [], [], 0.05)[0]:
@@ -494,6 +497,13 @@ into the new scene with proper lighting and shadows."""
                     break
                 idx = (idx + 1) % total
                 show_current()
+                last_advance = time.time()
+
+            # Auto-advance every 60 seconds
+            if time.time() - last_advance >= 60:
+                idx = (idx + 1) % total
+                show_current()
+                last_advance = time.time()
 
             if gpio_chip is not None:
                 import lgpio
@@ -505,9 +515,18 @@ into the new scene with proper lighting and shadows."""
                     if now - btn_time >= 1.5:
                         break
                     else:
-                        idx = (idx + 1) % total
-                        show_current()
+                        gal_click_count += 1
+                        last_gal_click = now
+                        if gal_click_count >= 3:
+                            break
                 last_btn = state
+
+                # Single click timeout - advance
+                if gal_click_count > 0 and now - last_gal_click > 0.5:
+                    idx = (idx + 1) % total
+                    show_current()
+                    last_advance = time.time()
+                    gal_click_count = 0
 
         print("\r\n[Exit gallery]\r\n", end='', flush=True)
         if self.last_image:
