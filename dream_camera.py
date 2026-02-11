@@ -120,8 +120,8 @@ class DreamCamera:
         original.convert('RGB').save(orig_path, quality=95)
         dreamed.convert('RGB').save(dream_path, quality=95)
 
-        print(f"\rSaved: {os.path.basename(orig_path)}\r\n", flush=True)
-        print(f"\rSaved: {os.path.basename(dream_path)}\r\n", flush=True)
+        print(f"\rSaved: {os.path.basename(orig_path)}\r\n", end='', flush=True)
+        print(f"\rSaved: {os.path.basename(dream_path)}\r\n", end='', flush=True)
         return orig_path, dream_path
 
     def capture_photo(self):
@@ -364,7 +364,7 @@ into the new scene with proper lighting and shadows."""
         """Capture, dream, and display with loading animation."""
         import threading
 
-        print("\rCapturing...\r\n", flush=True)
+        print("\rCapturing...\r\n", end='', flush=True)
         photo = self.capture_photo()
 
         # Show photo immediately
@@ -389,7 +389,7 @@ into the new scene with proper lighting and shadows."""
         thread.start()
 
         # Animate spinner while waiting (partial refresh only)
-        print("\rProcessing with AI...\r\n", flush=True)
+        print("\rProcessing with AI...\r\n", end='', flush=True)
         start = time.time()
         frame = 0
 
@@ -402,10 +402,10 @@ into the new scene with proper lighting and shadows."""
             time.sleep(0.2)
 
         thread.join()
-        print(f"\rDream time: {time.time() - start:.1f}s\r\n", flush=True)
+        print(f"\rDream time: {time.time() - start:.1f}s\r\n", end='', flush=True)
 
         if error[0]:
-            print(f"\rError: {error[0]}\r\n", flush=True)
+            print(f"\rError: {error[0]}\r\n", end='', flush=True)
             return
 
         dreamed = result[0]
@@ -414,7 +414,7 @@ into the new scene with proper lighting and shadows."""
         self.save_images(photo, dreamed)
 
         # Show final result
-        print("\rDisplaying...\r\n", flush=True)
+        print("\rDisplaying...\r\n", end='', flush=True)
         if side_by_side:
             final_image = self.make_side_by_side(photo, dreamed)
         else:
@@ -423,11 +423,11 @@ into the new scene with proper lighting and shadows."""
         self.display.show_image(final_image, mode=MODE_GC16)
         self.last_image = final_image  # Store for style banner restore
         self.capture_count += 1
-        print("\rDone!\r\n", flush=True)
+        print("\rDone!\r\n", end='', flush=True)
 
         # Auto-reset every 10 captures to prevent freezing
         if self.capture_count % 10 == 0:
-            print("\r[Auto-reset to prevent freeze]\r\n", flush=True)
+            print("\r[Auto-reset to prevent freeze]\r\n", end='', flush=True)
             self.display.reset()
             if self.last_image:
                 self.display.show_image(self.last_image, mode=MODE_GC16)
@@ -457,6 +457,61 @@ into the new scene with proper lighting and shadows."""
     def _key_pressed(self):
         """Check if a key was pressed (non-blocking)."""
         return select.select([sys.stdin], [], [], 0)[0]
+
+    def gallery_mode(self, gpio_chip=None, gpio_pin=None):
+        """Browse saved dream images (most recent first). Skips originals."""
+        if not self.save_dir or not os.path.isdir(self.save_dir):
+            print("\rNo dreams saved\r\n", end='', flush=True)
+            return
+
+        import glob as _glob
+        files = sorted(_glob.glob(os.path.join(self.save_dir, '*.jpg')))
+        dreams = [f for f in files if '_original.' not in os.path.basename(f)]
+
+        if not dreams:
+            print("\rNo dreams saved\r\n", end='', flush=True)
+            return
+
+        dreams.reverse()  # Most recent first
+        idx = 0
+        total = len(dreams)
+
+        def show_current():
+            name = os.path.basename(dreams[idx])
+            print(f"\r  {idx+1}/{total}: {name}\r\n", end='', flush=True)
+            self.display.show_image(dreams[idx], mode=MODE_GC16)
+
+        print(f"\r\n[Gallery: {total} dreams]\r\n", end='', flush=True)
+        show_current()
+
+        last_btn = 1
+        btn_time = 0
+
+        while True:
+            if select.select([sys.stdin], [], [], 0.05)[0]:
+                key = sys.stdin.read(1)
+                if key in ('q', 'g'):
+                    break
+                idx = (idx + 1) % total
+                show_current()
+
+            if gpio_chip is not None:
+                import lgpio
+                state = lgpio.gpio_read(gpio_chip, gpio_pin)
+                now = time.time()
+                if last_btn == 1 and state == 0:
+                    btn_time = now
+                elif last_btn == 0 and state == 1:
+                    if now - btn_time >= 1.5:
+                        break
+                    else:
+                        idx = (idx + 1) % total
+                        show_current()
+                last_btn = state
+
+        print("\r\n[Exit gallery]\r\n", end='', flush=True)
+        if self.last_image:
+            self.display.show_image(self.last_image, mode=MODE_GC16)
 
     def show_style_banner(self):
         """Show current style as banner on display, then restore last image."""
@@ -491,7 +546,7 @@ into the new scene with proper lighting and shadows."""
         styles = list(DREAM_STYLES.keys())
         idx = styles.index(self.style)
         self.style = styles[(idx + 1) % len(styles)]
-        print(f"\rStyle: {self.style}\r\n\r  {DREAM_STYLES[self.style][:50]}...\r\n", flush=True)
+        print(f"\rStyle: {self.style}\r\n\r  {DREAM_STYLES[self.style][:50]}...\r\n", end='', flush=True)
         if show_banner:
             self.show_style_banner()
 
@@ -504,6 +559,7 @@ into the new scene with proper lighting and shadows."""
         print("  1 / short press  - Capture and dream")
         print("  s / hold 1.5s    - Enter style mode")
         print("      (press to cycle, double-click or wait to confirm)")
+        print("  g / triple-click - Gallery (browse dreams)")
         print("  3 - Side-by-side")
         print("  2 - Stream")
         print("  c - Clear")
@@ -514,6 +570,8 @@ into the new scene with proper lighting and shadows."""
         gpio_chip = None
         last_button_state = 1
         button_press_time = 0
+        click_count = 0
+        last_click_time = 0
         style_mode = False
         style_mode_start = 0
         last_style_press = 0
@@ -543,7 +601,7 @@ into the new scene with proper lighting and shadows."""
                     key = sys.stdin.read(1)
 
                     if key == 'q':
-                        print("\r\nQuitting...\r\n")
+                        print("\r\nQuitting...\r\n", end='')
                         break
                     elif key == '1':
                         self.dream_and_display(side_by_side=False)
@@ -554,13 +612,15 @@ into the new scene with proper lighting and shadows."""
                     elif key == 's':
                         self.cycle_style()
                     elif key == 'c':
-                        print("\r\nClearing...\r\n", flush=True)
+                        print("\r\nClearing...\r\n", end='', flush=True)
                         self.display.clear()
-                        print("\rDone!\r\n", flush=True)
+                        print("\rDone!\r\n", end='', flush=True)
+                    elif key == 'g':
+                        self.gallery_mode(gpio_chip, gpio_pin)
                     elif key == 'r':
-                        print("\r\nResetting display...\r\n", flush=True)
+                        print("\r\nResetting display...\r\n", end='', flush=True)
                         self.display.reset()
-                        print("\rDone!\r\n", flush=True)
+                        print("\rDone!\r\n", end='', flush=True)
 
                 # Check GPIO button with style mode
                 if gpio_chip is not None:
@@ -578,17 +638,22 @@ into the new scene with proper lighting and shadows."""
                             # Button still held - check for long press
                             if now - button_press_time >= 1.5 and not style_mode:
                                 # Enter style mode
+                                click_count = 0
                                 style_mode = True
                                 style_mode_start = now
                                 last_style_press = now
-                                print("\r\n[Style Mode]\r\n", flush=True)
+                                print("\r\n[Style Mode]\r\n", end='', flush=True)
                                 self.show_style_banner()
 
                         elif last_button_state == 0 and state == 1:
-                            # Button released - short press = capture
+                            # Button released - count clicks
                             if now - button_press_time < 1.5:
-                                print("\r\n[Capture]\r\n", flush=True)
-                                self.dream_and_display(side_by_side=False)
+                                click_count += 1
+                                last_click_time = now
+                                if click_count >= 3:
+                                    print("\r\n[Gallery]\r\n", end='', flush=True)
+                                    self.gallery_mode(gpio_chip, gpio_pin)
+                                    click_count = 0
 
                     else:
                         # Style mode - each press cycles, timeout or double-click exits
@@ -596,7 +661,7 @@ into the new scene with proper lighting and shadows."""
                             # Button pressed in style mode
                             if now - last_style_press < 0.4:
                                 # Double click - exit style mode
-                                print("\r\n[Style confirmed]\r\n", flush=True)
+                                print("\r\n[Style confirmed]\r\n", end='', flush=True)
                                 style_mode = False
                                 if self.last_image:
                                     self.display.show_image(self.last_image, mode=MODE_A2)
@@ -607,12 +672,18 @@ into the new scene with proper lighting and shadows."""
 
                         # Timeout - exit style mode after 3 seconds of no input
                         if now - last_style_press > 3.0:
-                            print("\r\n[Style confirmed]\r\n", flush=True)
+                            print("\r\n[Style confirmed]\r\n", end='', flush=True)
                             style_mode = False
                             if self.last_image:
                                 self.display.show_image(self.last_image, mode=MODE_A2)
 
                     last_button_state = state
+
+                    # Click timeout - pending clicks become a capture
+                    if click_count > 0 and now - last_click_time > 0.5:
+                        print("\r\n[Capture]\r\n", end='', flush=True)
+                        self.dream_and_display(side_by_side=False)
+                        click_count = 0
 
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
