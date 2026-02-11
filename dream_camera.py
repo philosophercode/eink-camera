@@ -479,7 +479,10 @@ into the new scene with proper lighting and shadows."""
         def show_current():
             name = os.path.basename(dreams[idx])
             print(f"\r  {idx+1}/{total}: {name}\r\n", end='', flush=True)
-            self.display.show_image(dreams[idx], mode=MODE_GC16)
+            try:
+                self.display.show_image(dreams[idx], mode=MODE_GC16)
+            except Exception:
+                print(f"\r  (skipping corrupt file)\r\n", end='', flush=True)
 
         print(f"\r\n[Gallery: {total} dreams]\r\n", end='', flush=True)
         show_current()
