@@ -57,7 +57,7 @@ except ImportError:
     print("Install with: pip install google-genai pillow")
 
 
-# Dream styles - art styles first, then environments
+# Dream styles - ordered: art filters, creative framing, fun, time/era, text modes, environments
 DREAM_STYLES = {
     # Art styles - transform the image style
     'clay': "transform into a claymation character like Wallace and Gromit, smooth clay texture, stop-motion animation style, handcrafted look",
@@ -70,6 +70,27 @@ DREAM_STYLES = {
     'pixel': "retro pixel art, 16-bit video game style, blocky pixels, nostalgic gaming aesthetic",
     'sculpture': "classical marble sculpture, ancient Greek/Roman statue, carved stone, museum quality",
     'woodcut': "traditional woodblock print, bold black lines, vintage illustration style, old book aesthetic",
+    # Creative framing - themed image generation
+    'wanted': "old west wanted poster on aged yellowed parchment, big bold text WANTED DEAD OR ALIVE at top, reward amount at bottom, rough sketch portrait style",
+    'card': "collectible trading card with ornate portrait frame, character stats and attributes along the bottom, name plate, holographic border, game card style",
+    'newspaper': "old-timey newspaper front page, large dramatic headline, grainy halftone photo, columns of text, vintage newsprint, The Daily Chronicle masthead",
+    'poster': "dramatic cinematic movie poster, epic lighting, movie title at bottom in bold typography, credits text, theatrical one-sheet style",
+    'album': "music album cover, artistic composition, band name text at top, album title, vinyl record aesthetic, iconic cover art style",
+    # Fun transforms
+    'lego': "Lego minifigure version, plastic brick style, yellow skin, blocky proportions, Lego set box art aesthetic",
+    'stained': "stained glass window design, lead lines between colored glass segments, cathedral window style, jewel tones, backlit glow",
+    'tattoo': "traditional tattoo flash sheet, bold black outlines, classic American traditional tattoo style, banner with text, old school ink",
+    # Time/era transforms
+    'victorian': "daguerreotype portrait, sepia toned, formal Victorian-era pose, ornate oval frame, 1860s photography style, slight vignette",
+    'renaissance': "classical Renaissance oil painting portrait, ornate gilded frame, Rembrandt lighting, rich dark background, Old Masters style",
+    'future': "cyberpunk sci-fi portrait, neon accents, holographic elements, futuristic HUD overlay, digital glitch effects, year 2084 aesthetic",
+    # Text modes - AI generates text about the photo (not images)
+    'describe': "Describe what you see in this photo in vivid, evocative detail. Write 2-3 sentences that paint a picture with words.",
+    'poem': "Write a short poem (4-8 lines) inspired by what you see in this photo. Be creative and evocative.",
+    'haiku': "Write a haiku (three lines: 5 syllables, 7 syllables, 5 syllables) inspired by this photo.",
+    'roast': "Write a funny, playful roast of what you see in this photo. Keep it lighthearted and good-natured. 1-2 sentences.",
+    'fortune': "Look at this photo and write a mysterious, cryptic fortune cookie prediction inspired by what you see. One sentence only.",
+    'story': "Write a 3-sentence flash fiction story inspired by this photo. Make it intriguing and complete.",
     # Environments - change the background
     'jungle': "dense tropical rainforest with lush green foliage, exotic plants, hanging vines, dappled sunlight through the canopy",
     'underwater': "deep ocean scene with blue water, coral reefs, tropical fish swimming around, light rays from above, bubbles",
@@ -134,6 +155,52 @@ class DreamCamera:
         print(f"\rSaved: {os.path.basename(dream_path)}\r\n", end='', flush=True)
         return orig_path, dream_path
 
+    def generate_text(self, image):
+        """Use Gemini to generate text about a photo (for text modes)."""
+        if not self.client:
+            return "AI not available"
+
+        buf = io.BytesIO()
+        image.save(buf, format='JPEG')
+        image_bytes = buf.getvalue()
+
+        prompt = DREAM_STYLES[self.style]
+
+        try:
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[
+                    types.Content(
+                        role='user',
+                        parts=[
+                            types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
+                            types.Part.from_text(text=prompt),
+                        ]
+                    )
+                ]
+            )
+            return response.text.strip()
+        except Exception as e:
+            return f"Error: {e}"
+
+    def save_text_result(self, original, text):
+        """Save original photo and generated text for text modes."""
+        if not self.save_dir:
+            return
+
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+        orig_path = os.path.join(self.save_dir, f"{timestamp}_original.jpg")
+        text_path = os.path.join(self.save_dir, f"{timestamp}_{self.style}.txt")
+
+        original.convert('RGB').save(orig_path, quality=95)
+        with open(text_path, 'w') as f:
+            f.write(text)
+
+        print(f"\rSaved: {os.path.basename(orig_path)}\r\n", end='', flush=True)
+        print(f"\rSaved: {os.path.basename(text_path)}\r\n", end='', flush=True)
+
     def capture_photo(self):
         """Capture a photo using libcamera."""
         tmp_path = '/tmp/capture.jpg'
@@ -182,7 +249,15 @@ class DreamCamera:
             return "a person"
 
     # Art styles that transform the whole image (vs environment styles that change background)
-    ART_STYLES = {'clay', 'pencil', 'sharpie', 'lineart', 'charcoal', 'watercolor', 'comic', 'pixel', 'sculpture', 'woodcut'}
+    ART_STYLES = {
+        'clay', 'pencil', 'sharpie', 'lineart', 'charcoal', 'watercolor', 'comic', 'pixel', 'sculpture', 'woodcut',
+        'wanted', 'card', 'newspaper', 'poster', 'album',
+        'lego', 'stained', 'tattoo',
+        'victorian', 'renaissance', 'future',
+    }
+
+    # Text modes - AI generates text, not images
+    TEXT_MODES = {'describe', 'poem', 'haiku', 'roast', 'fortune', 'story'}
 
     def dream_image(self, image, quiet=False):
         """
@@ -381,6 +456,50 @@ into the new scene with proper lighting and shadows."""
         photo_gray = photo.convert('L').resize((self.width, self.height))
         self.display.show_image(photo_gray, mode=MODE_A2)
 
+        # Text modes: generate text instead of image
+        if self.style in self.TEXT_MODES:
+            print(f"\rGenerating {self.style}...\r\n", end='', flush=True)
+
+            # Spinner while generating text
+            spinner_x = self.width - self.SPINNER_SIZE - 30
+            spinner_y = 30
+            result = [None]
+            error = [None]
+
+            def process_text():
+                try:
+                    result[0] = self.generate_text(photo)
+                except Exception as e:
+                    error[0] = e
+
+            thread = threading.Thread(target=process_text)
+            thread.start()
+
+            start = time.time()
+            frame = 0
+            while thread.is_alive():
+                spinner = self.get_spinner_region(frame)
+                self.display.display(spinner.tobytes(), x=spinner_x, y=spinner_y,
+                                    w=self.SPINNER_SIZE, h=self.SPINNER_SIZE, mode=MODE_A2)
+                frame += 1
+                time.sleep(0.2)
+
+            thread.join()
+            print(f"\rGenerate time: {time.time() - start:.1f}s\r\n", end='', flush=True)
+
+            if error[0]:
+                print(f"\rError: {error[0]}\r\n", end='', flush=True)
+                return
+
+            text = result[0]
+            self.screen.show_text_result(self.style, text)
+            self.save_text_result(photo, text)
+            self.last_image = None  # Text modes don't produce gallery images
+            self.capture_count += 1
+            print("\rDone!\r\n", end='', flush=True)
+            return
+
+        # Image modes: existing pipeline
         # Spinner position (top right corner with margin)
         spinner_x = self.width - self.SPINNER_SIZE - 30
         spinner_y = 30

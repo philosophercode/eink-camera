@@ -4,7 +4,7 @@
 import time
 from PIL import Image, ImageDraw, ImageFont
 
-from eink import MODE_A2, MODE_INIT
+from eink import MODE_A2, MODE_GC16, MODE_INIT
 
 
 class ScreenRenderer:
@@ -40,6 +40,16 @@ class ScreenRenderer:
             self.font_big = ImageFont.load_default()
             self.font_med = self.font_big
             self.font_small = self.font_big
+            self.font_body = self.font_big
+            return
+
+        # Body font for dense readable text (text modes)
+        for path in font_paths:
+            try:
+                self.font_body = ImageFont.truetype(path, 36)
+                break
+            except (IOError, OSError):
+                continue
 
     def show_screen(self, title, subtitle=None, body=None, mode=MODE_A2):
         """General centered text screen. Full clear first to prevent ghosting."""
@@ -148,3 +158,58 @@ class ScreenRenderer:
                   anchor="mm", font=self.font_med, fill=180)
 
         self.display.show_image(img, mode=MODE_A2)
+
+    def _wrap_text(self, text, font, max_width):
+        """Word-wrap text to fit within max_width pixels. Returns list of lines."""
+        lines = []
+        for paragraph in text.split('\n'):
+            if not paragraph.strip():
+                lines.append('')
+                continue
+            words = paragraph.split()
+            if not words:
+                lines.append('')
+                continue
+            current_line = words[0]
+            for word in words[1:]:
+                test = current_line + ' ' + word
+                if font.getlength(test) <= max_width:
+                    current_line = test
+                else:
+                    lines.append(current_line)
+                    current_line = word
+            lines.append(current_line)
+        return lines
+
+    def show_text_result(self, mode_name, text):
+        """Display AI-generated text on e-ink with title and word-wrapped body."""
+        self.display.clear(MODE_INIT)
+
+        img = Image.new('L', (self.width, self.height), 255)
+        draw = ImageDraw.Draw(img)
+
+        margin = 100
+        max_text_width = self.width - margin * 2
+
+        # Title
+        title_y = 80
+        draw.text((self.width // 2, title_y), mode_name.upper(),
+                  anchor="mm", font=self.font_med, fill=0)
+
+        # Divider
+        divider_y = title_y + 50
+        draw.line([(margin, divider_y), (self.width - margin, divider_y)],
+                  fill=120, width=2)
+
+        # Word-wrapped body text
+        body_y = divider_y + 40
+        lines = self._wrap_text(text, self.font_body, max_text_width)
+        line_height = 48
+
+        for line in lines:
+            if body_y + line_height > self.height - 40:
+                break
+            draw.text((margin, body_y), line, font=self.font_body, fill=30)
+            body_y += line_height
+
+        self.display.show_image(img, mode=MODE_GC16)
