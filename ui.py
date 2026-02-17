@@ -42,7 +42,9 @@ class ScreenRenderer:
             self.font_small = self.font_big
 
     def show_screen(self, title, subtitle=None, body=None, mode=MODE_A2):
-        """General centered text screen."""
+        """General centered text screen. Clears display first to prevent ghosting."""
+        self.display.clear(MODE_A2)
+
         img = Image.new('L', (self.width, self.height), 255)
         draw = ImageDraw.Draw(img)
 
@@ -98,7 +100,9 @@ class ScreenRenderer:
         time.sleep(duration)
 
     def show_style_banner(self, name, desc):
-        """Show style name and description."""
+        """Show style name and description. Clears display first."""
+        self.display.clear(MODE_A2)
+
         img = Image.new('L', (self.width, self.height), 255)
         draw = ImageDraw.Draw(img)
 

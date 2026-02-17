@@ -531,6 +531,9 @@ into the new scene with proper lighting and shadows."""
 
         print("")
 
+        # Full clear on startup to wipe any previous content
+        self.display.clear()
+
         # Show splash screen and capture mode
         self.screen.show_splash("Digital Polaroid", duration=2.5)
         self.screen.show_capture_mode()
