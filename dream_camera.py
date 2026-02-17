@@ -57,19 +57,8 @@ except ImportError:
     print("Install with: pip install google-genai pillow")
 
 
-# Dream styles - environments and art styles
+# Dream styles - art styles first, then environments
 DREAM_STYLES = {
-    # Environments - change the background
-    'jungle': "dense tropical rainforest with lush green foliage, exotic plants, hanging vines, dappled sunlight through the canopy",
-    'underwater': "deep ocean scene with blue water, coral reefs, tropical fish swimming around, light rays from above, bubbles",
-    'city': "Times Square New York City at night with bright neon signs, yellow taxis, crowds of people, urban energy",
-    'space': "floating in outer space with Earth visible below, stars and galaxies in background, astronaut vibes",
-    'beach': "beautiful tropical beach at sunset, palm trees, golden sand, turquoise water, orange and pink sky",
-    'mountain': "top of a snowy mountain peak, dramatic clouds below, bright blue sky, epic alpine vista",
-    'mars': "surface of Mars with red rocky terrain, dusty atmosphere, distant mountains, alien landscape",
-    'tokyo': "neon-lit Tokyo street at night, Japanese signs, rain-slicked streets, cyberpunk atmosphere",
-    'safari': "African savanna at golden hour, acacia trees, distant elephants, dramatic sky, wild adventure",
-    'castle': "inside a grand medieval castle, stone walls, torches, red banners, dramatic lighting",
     # Art styles - transform the image style
     'clay': "transform into a claymation character like Wallace and Gromit, smooth clay texture, stop-motion animation style, handcrafted look",
     'pencil': "detailed pencil sketch drawing, fine graphite lines, subtle shading, artist sketchbook style, hand-drawn",
@@ -81,9 +70,20 @@ DREAM_STYLES = {
     'pixel': "retro pixel art, 16-bit video game style, blocky pixels, nostalgic gaming aesthetic",
     'sculpture': "classical marble sculpture, ancient Greek/Roman statue, carved stone, museum quality",
     'woodcut': "traditional woodblock print, bold black lines, vintage illustration style, old book aesthetic",
+    # Environments - change the background
+    'jungle': "dense tropical rainforest with lush green foliage, exotic plants, hanging vines, dappled sunlight through the canopy",
+    'underwater': "deep ocean scene with blue water, coral reefs, tropical fish swimming around, light rays from above, bubbles",
+    'city': "Times Square New York City at night with bright neon signs, yellow taxis, crowds of people, urban energy",
+    'space': "floating in outer space with Earth visible below, stars and galaxies in background, astronaut vibes",
+    'beach': "beautiful tropical beach at sunset, palm trees, golden sand, turquoise water, orange and pink sky",
+    'mountain': "top of a snowy mountain peak, dramatic clouds below, bright blue sky, epic alpine vista",
+    'mars': "surface of Mars with red rocky terrain, dusty atmosphere, distant mountains, alien landscape",
+    'tokyo': "neon-lit Tokyo street at night, Japanese signs, rain-slicked streets, cyberpunk atmosphere",
+    'safari': "African savanna at golden hour, acacia trees, distant elephants, dramatic sky, wild adventure",
+    'castle': "inside a grand medieval castle, stone walls, torches, red banners, dramatic lighting",
 }
 
-DEFAULT_STYLE = 'jungle'
+DEFAULT_STYLE = 'clay'
 
 
 class DreamCamera:
