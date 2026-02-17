@@ -207,6 +207,12 @@ class EInkDisplay:
         self.fd = os.open(device, os.O_RDWR | os.O_NONBLOCK)
         self._get_device_info()
 
+        # Full init clear on startup: black then white to reset all particles
+        black = bytes([0x00] * (self.width * self.height))
+        self.display(black, mode=MODE_INIT)
+        white = bytes([0xFF] * (self.width * self.height))
+        self.display(white, mode=MODE_INIT)
+
     def _get_device_info(self):
         """Query display info from IT8951."""
         cmd = bytes([
