@@ -10,6 +10,7 @@ ExecStart=/home/isaacsteinberg/Developer/eink-camera/dream /dev/sg0
 WorkingDirectory=/home/isaacsteinberg/Developer/eink-camera
 Restart=on-failure
 RestartSec=5
+Environment=PYTHONUNBUFFERED=1
 Environment=GOOGLE_API_KEY=
 EnvironmentFile=-/home/isaacsteinberg/Developer/eink-camera/.env
 StandardOutput=journal
