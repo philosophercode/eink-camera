@@ -695,11 +695,11 @@ into the new scene with proper lighting and shadows."""
                                 mode_carousel_active = True
                                 cur_idx = MODE_KEYS.index(mode)
                                 mode_carousel_idx = (cur_idx + 1) % len(MODE_KEYS)
-                                mode_carousel_last_advance = now
                                 print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n", end='', flush=True)
                                 self.screen.show_style_carousel(
                                     MODE_NAMES, MODE_DESCS, mode_carousel_idx,
                                     first_frame=True)
+                                mode_carousel_last_advance = time.time()
 
                         elif last_btn == 0 and state == 1:
                             hold = now - btn_time
@@ -710,12 +710,12 @@ into the new scene with proper lighting and shadows."""
                     else:
                         # Mode carousel - cycle while held, select on release
                         if state == 0:
-                            if now - mode_carousel_last_advance >= 1.2:
+                            if now - mode_carousel_last_advance >= 2.0:
                                 mode_carousel_idx = (mode_carousel_idx + 1) % len(MODE_KEYS)
-                                mode_carousel_last_advance = now
                                 print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n", end='', flush=True)
                                 self.screen.show_style_carousel(
                                     MODE_NAMES, MODE_DESCS, mode_carousel_idx)
+                                mode_carousel_last_advance = time.time()
 
                         elif last_btn == 0 and state == 1:
                             # Released - select mode
