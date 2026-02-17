@@ -44,7 +44,7 @@ except ImportError:
 # Import our e-ink driver and UI components
 from eink import EInkDisplay, MODE_GC16, MODE_A2, MODE_INIT
 from ui import ScreenRenderer
-from gallery import GalleryBrowser
+from gallery import load_dream_images, show_gallery_image
 
 # Google AI imports (new google-genai package)
 try:
@@ -470,11 +470,6 @@ into the new scene with proper lighting and shadows."""
             return False
         return select.select([sys.stdin], [], [], 0)[0]
 
-    def gallery_mode(self, gpio_chip=None, gpio_pin=None):
-        """Browse saved dream images using GalleryBrowser."""
-        gallery = GalleryBrowser(self.display, self.screen, self.save_dir)
-        gallery.run(gpio_chip=gpio_chip, gpio_pin=gpio_pin)
-
     def cycle_style(self):
         """Cycle to next dream style (keyboard shortcut)."""
         styles = list(DREAM_STYLES.keys())
@@ -482,30 +477,41 @@ into the new scene with proper lighting and shadows."""
         self.style = styles[(idx + 1) % len(styles)]
         print(f"\rStyle: {self.style}\r\n\r  {DREAM_STYLES[self.style][:50]}...\r\n", end='', flush=True)
 
-    def _restore_or_capture_mode(self):
-        """Show last dream image or capture mode screen."""
-        if self.last_image:
-            self.display.show_image(self.last_image, mode=MODE_GC16)
-        else:
+    def _enter_mode(self, mode, gallery_images):
+        """Show the entry screen for a mode. Returns gallery images (reloaded for gallery/slideshow)."""
+        if mode == 'capture':
             self.screen.show_capture_mode()
+        elif mode in ('gallery', 'slideshow'):
+            gallery_images = load_dream_images(self.save_dir)
+            if not gallery_images:
+                print("\rNo dreams saved\r\n", end='', flush=True)
+                return None  # Signal: skip this mode
+            if mode == 'gallery':
+                self.screen.show_gallery_mode(len(gallery_images))
+            else:
+                self.screen.show_slideshow_mode(len(gallery_images))
+            show_gallery_image(self.display, gallery_images, 0)
+        return gallery_images
 
     def run(self, gpio_pin=None):
         """
-        Main interactive loop.
+        Main interactive loop with three modes.
 
-        Button controls:
-          1 click  - Capture and dream
-          2 clicks - Gallery mode
-          Hold     - Style carousel (cycles while held, selects on release)
+        Modes (2x click cycles between them):
+          Capture   - click to capture and dream
+          Gallery   - click to advance, manual only
+          Slideshow - auto-advances every 60s
+
+        Hold from any mode opens the style carousel.
         """
         print("\n=== AI Dream Camera ===")
         print(f"Display: {self.width}x{self.height}")
         print(f"Style: {self.style}")
         if HAS_TTY:
             print("\nControls:")
-            print("  1 / click    - Capture and dream")
-            print("  g / 2x click - Gallery")
-            print("  s / hold     - Style carousel")
+            print("  Click / 1    - Capture (or next in gallery/slideshow)")
+            print("  2x click / g - Next mode (capture→gallery→slideshow)")
+            print("  Hold / s     - Style carousel")
             print("  c - Clear | r - Reset | q - Quit")
         else:
             print("(No TTY - GPIO-only mode)")
@@ -531,12 +537,21 @@ into the new scene with proper lighting and shadows."""
         self.screen.show_splash("Digital Polaroid", duration=2.5)
         self.screen.show_capture_mode()
 
+        # App mode: 'capture', 'gallery', 'slideshow'
+        mode = 'capture'
+        MODE_ORDER = ['capture', 'gallery', 'slideshow']
+
+        # Gallery/slideshow state
+        gallery_images = []
+        gallery_idx = 0
+        last_advance = time.time()
+
         # Button state
         last_btn = 1
         btn_time = 0
         click_count = 0
         last_click_time = 0
-        carousel_mode = False
+        carousel_active = False
         carousel_idx = 0
         carousel_last_advance = 0
 
@@ -553,46 +568,69 @@ into the new scene with proper lighting and shadows."""
                 tty.setraw(sys.stdin.fileno())
 
             while True:
-                # Check keyboard (only if TTY available)
+                now = time.time()
+
+                # Slideshow auto-advance
+                if mode == 'slideshow' and gallery_images and now - last_advance >= 60:
+                    gallery_idx = (gallery_idx + 1) % len(gallery_images)
+                    show_gallery_image(self.display, gallery_images, gallery_idx)
+                    last_advance = now
+
+                # Keyboard (TTY only)
                 if HAS_TTY and select.select([sys.stdin], [], [], 0.05)[0]:
                     key = sys.stdin.read(1)
 
                     if key == 'q':
                         print("\r\nQuitting...\r\n", end='')
                         break
-                    elif key == '1':
-                        self.dream_and_display(side_by_side=False)
+                    elif key == '1' or key == ' ':
+                        # Click action
+                        if mode == 'capture':
+                            self.dream_and_display(side_by_side=False)
+                        elif mode in ('gallery', 'slideshow') and gallery_images:
+                            gallery_idx = (gallery_idx + 1) % len(gallery_images)
+                            show_gallery_image(self.display, gallery_images, gallery_idx)
+                            last_advance = now
+                    elif key == 'g':
+                        # Next mode
+                        next_idx = (MODE_ORDER.index(mode) + 1) % len(MODE_ORDER)
+                        next_mode = MODE_ORDER[next_idx]
+                        result = self._enter_mode(next_mode, gallery_images)
+                        if result is not None:
+                            gallery_images = result
+                            gallery_idx = 0
+                            last_advance = now
+                            mode = next_mode
+                            print(f"\r\n[{mode.title()}]\r\n", end='', flush=True)
+                        else:
+                            # No images - skip to capture
+                            mode = 'capture'
+                            self.screen.show_capture_mode()
                     elif key == 's':
                         self.cycle_style()
-                    elif key == 'g':
-                        self.gallery_mode(gpio_chip, gpio_pin)
-                        self._restore_or_capture_mode()
                     elif key == 'c':
-                        print("\r\nClearing...\r\n", end='', flush=True)
                         self.display.clear()
+                        mode = 'capture'
                         self.screen.show_capture_mode()
                     elif key == 'r':
-                        print("\r\nResetting display...\r\n", end='', flush=True)
                         self.display.reset()
+                        mode = 'capture'
                         self.screen.show_capture_mode()
 
                 # GPIO button state machine
                 if gpio_chip is not None:
                     import lgpio
                     state = lgpio.gpio_read(gpio_chip, gpio_pin)
-                    now = time.time()
 
-                    if not carousel_mode:
-                        # Normal mode
+                    if not carousel_active:
                         if last_btn == 1 and state == 0:
-                            # Button pressed
                             btn_time = now
 
                         elif last_btn == 0 and state == 0:
                             # Still held - enter carousel at 1.5s
                             if now - btn_time >= 1.5:
                                 click_count = 0
-                                carousel_mode = True
+                                carousel_active = True
                                 carousel_idx = style_names.index(self.style)
                                 carousel_last_advance = now
                                 print("\r\n[Style carousel]\r\n", end='', flush=True)
@@ -601,15 +639,13 @@ into the new scene with proper lighting and shadows."""
                                     first_frame=True)
 
                         elif last_btn == 0 and state == 1:
-                            # Released (short press) - count click
                             if now - btn_time < 1.5:
                                 click_count += 1
                                 last_click_time = now
 
                     else:
-                        # Carousel mode - cycle while held, select on release
+                        # Carousel - cycle while held, select on release
                         if state == 0:
-                            # Still held - advance every 0.8s
                             if now - carousel_last_advance >= 0.8:
                                 carousel_idx = (carousel_idx + 1) % len(style_names)
                                 carousel_last_advance = now
@@ -617,26 +653,49 @@ into the new scene with proper lighting and shadows."""
                                     style_names, style_descs, carousel_idx)
 
                         elif last_btn == 0 and state == 1:
-                            # Released - select current style
                             self.style = style_names[carousel_idx]
-                            carousel_mode = False
+                            carousel_active = False
                             print(f"\r\n[Style: {self.style}]\r\n", end='', flush=True)
-                            self._restore_or_capture_mode()
+                            # Return to current mode's display
+                            if mode == 'capture':
+                                if self.last_image:
+                                    self.display.show_image(self.last_image, mode=MODE_GC16)
+                                else:
+                                    self.screen.show_capture_mode()
+                            elif mode in ('gallery', 'slideshow') and gallery_images:
+                                show_gallery_image(self.display, gallery_images, gallery_idx)
 
                     last_btn = state
 
                     # Click timeout - process pending clicks
-                    if not carousel_mode and click_count > 0 and now - last_click_time > 0.4:
+                    if not carousel_active and click_count > 0 and now - last_click_time > 0.4:
                         if click_count == 1:
-                            print("\r\n[Capture]\r\n", end='', flush=True)
-                            self.dream_and_display(side_by_side=False)
+                            # Single click - mode action
+                            if mode == 'capture':
+                                print("\r\n[Capture]\r\n", end='', flush=True)
+                                self.dream_and_display(side_by_side=False)
+                            elif mode in ('gallery', 'slideshow') and gallery_images:
+                                gallery_idx = (gallery_idx + 1) % len(gallery_images)
+                                show_gallery_image(self.display, gallery_images, gallery_idx)
+                                last_advance = now
                         elif click_count >= 2:
-                            print("\r\n[Gallery]\r\n", end='', flush=True)
-                            self.gallery_mode(gpio_chip, gpio_pin)
-                            self._restore_or_capture_mode()
+                            # Double click - next mode
+                            next_idx = (MODE_ORDER.index(mode) + 1) % len(MODE_ORDER)
+                            next_mode = MODE_ORDER[next_idx]
+                            result = self._enter_mode(next_mode, gallery_images)
+                            if result is not None:
+                                gallery_images = result
+                                gallery_idx = 0
+                                last_advance = now
+                                mode = next_mode
+                                print(f"\r\n[{mode.title()}]\r\n", end='', flush=True)
+                            else:
+                                # No images - skip to capture
+                                mode = 'capture'
+                                self.screen.show_capture_mode()
                         click_count = 0
 
-                # If no TTY and no GPIO, just sleep to avoid busy loop
+                # Avoid busy loop when no input sources
                 if not HAS_TTY and gpio_chip is None:
                     time.sleep(0.05)
 

@@ -48,7 +48,6 @@ class ScreenRenderer:
         img = Image.new('L', (self.width, self.height), 255)
         draw = ImageDraw.Draw(img)
 
-        # Title centered vertically (offset up if there's more text)
         y_title = self.height // 2 - 80 if (subtitle or body) else self.height // 2
         draw.text((self.width // 2, y_title), title,
                   anchor="mm", font=self.font_big, fill=0)
@@ -76,14 +75,23 @@ class ScreenRenderer:
             body="2x: gallery | Hold: styles",
         )
 
-    def show_gallery_splash(self, total_images):
-        """Gallery entry splash with nav instructions."""
+    def show_gallery_mode(self, total_images):
+        """Gallery entry screen."""
         self.show_screen(
-            "Gallery Mode",
+            "Gallery",
             subtitle=f"{total_images} images",
-            body="Click: next | 2x: prev | Hold: exit",
+            body="Click: next | 2x: slideshow | Hold: styles",
         )
-        time.sleep(3)
+        time.sleep(2)
+
+    def show_slideshow_mode(self, total_images):
+        """Slideshow entry screen."""
+        self.show_screen(
+            "Slideshow",
+            subtitle=f"{total_images} images",
+            body="Auto-advances every 60s | 2x: capture",
+        )
+        time.sleep(2)
 
     def show_overlay(self, text, duration=1.0):
         """Brief text overlay for status feedback."""
@@ -100,9 +108,9 @@ class ScreenRenderer:
 
     def show_style_carousel(self, style_names, style_descs, current_idx, first_frame=False):
         """
-        Show vertical carousel with prev / CURRENT / next style.
+        Vertical carousel: prev / CURRENT / next style.
 
-        Uses MODE_INIT on first frame for clean entry, MODE_A2 for cycling.
+        MODE_INIT on first frame for clean entry, MODE_A2 for cycling.
         """
         total = len(style_names)
         prev_idx = (current_idx - 1) % total
@@ -120,10 +128,9 @@ class ScreenRenderer:
                   style_names[prev_idx].upper(),
                   anchor="mm", font=self.font_med, fill=180)
 
-        # Divider
         draw.line([(300, cy - 150), (self.width - 300, cy - 150)], fill=160, width=2)
 
-        # Current style (bold, large)
+        # Current style (bold)
         draw.text((self.width // 2, cy - 30),
                   style_names[current_idx].upper(),
                   anchor="mm", font=self.font_big, fill=0)
@@ -133,7 +140,6 @@ class ScreenRenderer:
         draw.text((self.width // 2, cy + 70),
                   short_desc, anchor="mm", font=self.font_small, fill=100)
 
-        # Divider
         draw.line([(300, cy + 150), (self.width - 300, cy + 150)], fill=160, width=2)
 
         # Next style (faded)
