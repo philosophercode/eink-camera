@@ -639,7 +639,9 @@ into the new scene with proper lighting and shadows."""
                                     first_frame=True)
 
                         elif last_btn == 0 and state == 1:
-                            if now - btn_time < 1.5:
+                            hold = now - btn_time
+                            if hold >= 0.05 and hold < 1.5:
+                                # Real click (>50ms debounce, <1.5s hold)
                                 click_count += 1
                                 last_click_time = now
 
