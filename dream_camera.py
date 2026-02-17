@@ -23,9 +23,16 @@ import io
 import time
 import subprocess
 import select
-import termios
-import tty
 from PIL import Image
+
+# TTY support - optional for systemd (headless) operation
+HAS_TTY = False
+try:
+    import termios
+    import tty
+    HAS_TTY = sys.stdin.isatty()
+except (ImportError, AttributeError):
+    pass
 
 # Load .env file automatically
 try:
@@ -34,8 +41,10 @@ try:
 except ImportError:
     pass  # dotenv not installed, use environment variables directly
 
-# Import our e-ink driver
+# Import our e-ink driver and UI components
 from eink import EInkDisplay, MODE_GC16, MODE_A2, MODE_INIT
+from ui import ScreenRenderer
+from gallery import GalleryBrowser
 
 # Google AI imports (new google-genai package)
 try:
@@ -82,6 +91,7 @@ class DreamCamera:
 
     def __init__(self, device='/dev/sg0', api_key=None, save_dir=None):
         self.display = EInkDisplay(device)
+        self.screen = ScreenRenderer(self.display)
         self.style = DEFAULT_STYLE
         self.width = self.display.width
         self.height = self.display.height
@@ -456,112 +466,18 @@ into the new scene with proper lighting and shadows."""
 
     def _key_pressed(self):
         """Check if a key was pressed (non-blocking)."""
+        if not HAS_TTY:
+            return False
         return select.select([sys.stdin], [], [], 0)[0]
 
     def gallery_mode(self, gpio_chip=None, gpio_pin=None):
-        """Browse saved dream images (most recent first). Skips originals."""
-        if not self.save_dir or not os.path.isdir(self.save_dir):
-            print("\rNo dreams saved\r\n", end='', flush=True)
-            return
-
-        import glob as _glob
-        files = sorted(_glob.glob(os.path.join(self.save_dir, '*.jpg')))
-        dreams = [f for f in files if '_original.' not in os.path.basename(f)]
-
-        if not dreams:
-            print("\rNo dreams saved\r\n", end='', flush=True)
-            return
-
-        dreams.reverse()  # Most recent first
-        idx = 0
-        total = len(dreams)
-
-        def show_current():
-            name = os.path.basename(dreams[idx])
-            print(f"\r  {idx+1}/{total}: {name}\r\n", end='', flush=True)
-            try:
-                self.display.show_image(dreams[idx], mode=MODE_GC16)
-            except Exception:
-                print(f"\r  (skipping corrupt file)\r\n", end='', flush=True)
-
-        print(f"\r\n[Gallery: {total} dreams]\r\n", end='', flush=True)
-        show_current()
-        last_advance = time.time()
-
-        last_btn = 1
-        btn_time = 0
-        gal_click_count = 0
-        last_gal_click = 0
-
-        while True:
-            if select.select([sys.stdin], [], [], 0.05)[0]:
-                key = sys.stdin.read(1)
-                if key in ('q', 'g'):
-                    break
-                idx = (idx + 1) % total
-                show_current()
-                last_advance = time.time()
-
-            # Auto-advance every 60 seconds
-            if time.time() - last_advance >= 60:
-                idx = (idx + 1) % total
-                show_current()
-                last_advance = time.time()
-
-            if gpio_chip is not None:
-                import lgpio
-                state = lgpio.gpio_read(gpio_chip, gpio_pin)
-                now = time.time()
-                if last_btn == 1 and state == 0:
-                    btn_time = now
-                elif last_btn == 0 and state == 1:
-                    if now - btn_time >= 1.5:
-                        break
-                    else:
-                        gal_click_count += 1
-                        last_gal_click = now
-                        if gal_click_count >= 3:
-                            break
-                last_btn = state
-
-                # Single click timeout - advance
-                if gal_click_count > 0 and now - last_gal_click > 0.5:
-                    idx = (idx + 1) % total
-                    show_current()
-                    last_advance = time.time()
-                    gal_click_count = 0
-
-        print("\r\n[Exit gallery]\r\n", end='', flush=True)
-        if self.last_image:
-            self.display.show_image(self.last_image, mode=MODE_GC16)
+        """Browse saved dream images using GalleryBrowser."""
+        gallery = GalleryBrowser(self.display, self.screen, self.save_dir)
+        gallery.run(gpio_chip=gpio_chip, gpio_pin=gpio_pin)
 
     def show_style_banner(self):
-        """Show current style as banner on display, then restore last image."""
-        from PIL import ImageDraw, ImageFont
-
-        # Create banner image
-        img = Image.new('L', (self.width, self.height), 255)
-        draw = ImageDraw.Draw(img)
-
-        # Try to load fonts
-        try:
-            font_big = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", 120)
-            font_small = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSans.ttf", 48)
-        except:
-            font_big = font_small = None
-
-        # Style name
-        style_name = self.style.upper()
-        draw.text((self.width // 2, self.height // 2 - 50),
-                  f"[ {style_name} ]", anchor="mm", font=font_big, fill=0)
-
-        # Description
-        desc = DREAM_STYLES[self.style][:60] + "..."
-        draw.text((self.width // 2, self.height // 2 + 80),
-                  desc, anchor="mm", font=font_small, fill=80)
-
-        # Show banner with fast refresh
-        self.display.show_image(img, mode=MODE_A2)
+        """Show current style as banner on display."""
+        self.screen.show_style_banner(self.style, DREAM_STYLES[self.style])
 
     def cycle_style(self, show_banner=False):
         """Cycle through dream styles."""
@@ -577,16 +493,19 @@ into the new scene with proper lighting and shadows."""
         print("\n=== AI Dream Camera ===")
         print(f"Display: {self.width}x{self.height}")
         print(f"Style: {self.style}")
-        print("\nControls:")
-        print("  1 / short press  - Capture and dream")
-        print("  s / hold 1.5s    - Enter style mode")
-        print("      (press to cycle, double-click or wait to confirm)")
-        print("  g / triple-click - Gallery (browse dreams)")
-        print("  3 - Side-by-side")
-        print("  2 - Stream")
-        print("  c - Clear")
-        print("  r - Reset display (if frozen)")
-        print("  q - Quit")
+        if HAS_TTY:
+            print("\nControls:")
+            print("  1 / short press  - Capture and dream")
+            print("  s / hold 1.5s    - Enter style mode")
+            print("      (press to cycle, double-click or wait to confirm)")
+            print("  g / triple-click - Gallery (browse dreams)")
+            print("  3 - Side-by-side")
+            print("  2 - Stream")
+            print("  c - Clear")
+            print("  r - Reset display (if frozen)")
+            print("  q - Quit")
+        else:
+            print("(No TTY - GPIO-only mode)")
 
         # Set up GPIO button if specified
         gpio_chip = None
@@ -612,14 +531,21 @@ into the new scene with proper lighting and shadows."""
 
         print("")
 
-        # Set terminal to raw mode
-        old_settings = termios.tcgetattr(sys.stdin)
+        # Show splash screen and capture mode
+        self.screen.show_splash("Digital Polaroid", duration=2.5)
+        self.screen.show_capture_mode()
+
+        # Set terminal to raw mode if TTY available
+        old_settings = None
+        if HAS_TTY:
+            old_settings = termios.tcgetattr(sys.stdin)
         try:
-            tty.setraw(sys.stdin.fileno())
+            if HAS_TTY:
+                tty.setraw(sys.stdin.fileno())
 
             while True:
-                # Check keyboard
-                if select.select([sys.stdin], [], [], 0.05)[0]:
+                # Check keyboard (only if TTY available)
+                if HAS_TTY and select.select([sys.stdin], [], [], 0.05)[0]:
                     key = sys.stdin.read(1)
 
                     if key == 'q':
@@ -636,12 +562,18 @@ into the new scene with proper lighting and shadows."""
                     elif key == 'c':
                         print("\r\nClearing...\r\n", end='', flush=True)
                         self.display.clear()
+                        self.screen.show_capture_mode()
                         print("\rDone!\r\n", end='', flush=True)
                     elif key == 'g':
                         self.gallery_mode(gpio_chip, gpio_pin)
+                        if self.last_image:
+                            self.display.show_image(self.last_image, mode=MODE_GC16)
+                        else:
+                            self.screen.show_capture_mode()
                     elif key == 'r':
                         print("\r\nResetting display...\r\n", end='', flush=True)
                         self.display.reset()
+                        self.screen.show_capture_mode()
                         print("\rDone!\r\n", end='', flush=True)
 
                 # Check GPIO button with style mode
@@ -675,6 +607,10 @@ into the new scene with proper lighting and shadows."""
                                 if click_count >= 3:
                                     print("\r\n[Gallery]\r\n", end='', flush=True)
                                     self.gallery_mode(gpio_chip, gpio_pin)
+                                    if self.last_image:
+                                        self.display.show_image(self.last_image, mode=MODE_GC16)
+                                    else:
+                                        self.screen.show_capture_mode()
                                     click_count = 0
 
                     else:
@@ -687,6 +623,8 @@ into the new scene with proper lighting and shadows."""
                                 style_mode = False
                                 if self.last_image:
                                     self.display.show_image(self.last_image, mode=MODE_A2)
+                                else:
+                                    self.screen.show_capture_mode()
                             else:
                                 # Single press - cycle style
                                 self.cycle_style(show_banner=True)
@@ -698,6 +636,8 @@ into the new scene with proper lighting and shadows."""
                             style_mode = False
                             if self.last_image:
                                 self.display.show_image(self.last_image, mode=MODE_A2)
+                            else:
+                                self.screen.show_capture_mode()
 
                     last_button_state = state
 
@@ -707,8 +647,13 @@ into the new scene with proper lighting and shadows."""
                         self.dream_and_display(side_by_side=False)
                         click_count = 0
 
+                # If no TTY and no GPIO, just sleep to avoid busy loop
+                if not HAS_TTY and gpio_chip is None:
+                    time.sleep(0.05)
+
         finally:
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+            if old_settings is not None:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
             if gpio_chip is not None:
                 import lgpio
                 lgpio.gpiochip_close(gpio_chip)

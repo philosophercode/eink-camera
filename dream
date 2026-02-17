@@ -5,4 +5,4 @@
 cd "$(dirname "$0")"
 
 # Activate venv and run
-exec venv/bin/python dream_camera.py "${1:-/dev/sg0}"
+exec venv/bin/python dream_camera.py "$@"

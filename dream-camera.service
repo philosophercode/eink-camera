@@ -1,0 +1,19 @@
+[Unit]
+Description=AI Dream Camera
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/home/isaacsteinberg/Developer/eink-camera/dream /dev/sg0
+WorkingDirectory=/home/isaacsteinberg/Developer/eink-camera
+Restart=on-failure
+RestartSec=5
+Environment=GOOGLE_API_KEY=
+EnvironmentFile=-/home/isaacsteinberg/Developer/eink-camera/.env
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

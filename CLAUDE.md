@@ -53,6 +53,15 @@ Physical button on GPIO17 (configurable) with pull-up resistor. Short press = ca
 - Pi Camera Module (accessed via `libcamera-still`)
 - ImageMagick `convert` command (C version only, for image processing)
 
+## Remote Access (Raspberry Pi 5)
+
+- SSH alias: `ssh rp5`
+- Remote project path: `~/Developer/eink-camera/`
+- Remote dreams path: `~/Developer/eink-camera/dreams/`
+- Local dreams download: `~/Downloads/dreams/`
+- Sync dreams to local: `rsync -avz --ignore-existing rp5:~/Developer/eink-camera/dreams/ ~/Downloads/dreams/`
+- Note: The dream camera requires an interactive TTY for keyboard input — cannot be launched headless via tool-based SSH. GPIO button input works regardless.
+
 ## Key Conventions
 
 - All display operations require `sudo` (SCSI device access)
