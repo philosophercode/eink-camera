@@ -648,7 +648,7 @@ into the new scene with proper lighting and shadows."""
                     else:
                         # Carousel - cycle while held, select on release
                         if state == 0:
-                            if now - carousel_last_advance >= 0.8:
+                            if now - carousel_last_advance >= 1.5:
                                 carousel_idx = (carousel_idx + 1) % len(style_names)
                                 carousel_last_advance = now
                                 self.screen.show_style_carousel(
