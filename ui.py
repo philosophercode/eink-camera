@@ -70,7 +70,7 @@ class ScreenRenderer:
     def show_capture_mode(self):
         """Idle screen with instructions."""
         self.show_screen(
-            "Capture Mode",
+            "Capture",
             subtitle="Press to capture",
             body="2x: gallery | Hold: styles",
         )
@@ -80,16 +80,7 @@ class ScreenRenderer:
         self.show_screen(
             "Gallery",
             subtitle=f"{total_images} images",
-            body="Click: next | 2x: slideshow | Hold: styles",
-        )
-        time.sleep(2)
-
-    def show_slideshow_mode(self, total_images):
-        """Slideshow entry screen."""
-        self.show_screen(
-            "Slideshow",
-            subtitle=f"{total_images} images",
-            body="Auto-advances every 60s | 2x: capture",
+            body="Click: next | 2x: prev | Hold: exit",
         )
         time.sleep(2)
 
