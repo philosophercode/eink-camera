@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>E-ink Camera Enclosure — Print Template</title>
+<style>
+  @page { size: letter; margin: 10mm; }
+  body { margin: 0; padding: 0; font-family: sans-serif; }
+  .page {
+    page-break-after: always;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260mm;
+  }
+  .dim line, .dim path { stroke: #333; stroke-width: 0.2; fill: none; }
+  @media screen {
+    .page {
+      border-bottom: 2px dashed #ddd;
+      padding: 10mm;
+      margin-bottom: 5mm;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+      <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+        <text x="50" y="12" font-size="5" text-anchor="middle" font-family="sans-serif"
+              font-weight="bold" fill="#333">Print Scale Check</text>
+        <text x="50" y="19" font-size="3.5" text-anchor="middle" font-family="sans-serif" fill="#666">
+          Measure this square with a ruler — it should be exactly 50mm
+        </text>
+        <rect x="25" y="25" width="50" height="50" fill="none" stroke="black" stroke-width="0.3"/>
+        <text x="50" y="53" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333">50 x 50 mm</text>
+        <text x="50" y="85" font-size="3" text-anchor="middle" font-family="sans-serif" fill="#999">
+          If not 50mm, check print settings: use "Actual Size", not "Fit to Page"
+        </text>
+      </svg>
+    </div>
+<div class="page">
+<svg xmlns="http://www.w3.org/2000/svg"
+         width="196mm" height="268mm"
+         viewBox="0 0 196 268"
+         style="max-width:100%; max-height:250mm;" overflow="visible">
+      <defs>
+        <marker id="arr" markerWidth="3" markerHeight="3" refX="1.5" refY="1.5"
+                orient="auto-start-reverse" markerUnits="strokeWidth">
+          <path d="M0,0 L3,1.5 L0,3Z" fill="#333"/>
+        </marker>
+      </defs>
+      <text x="98" y="12.5" font-size="4.5" text-anchor="middle"
+            font-family="sans-serif" font-weight="bold" fill="#333">Front Plate  146 x 218 mm</text>
+      <g fill="none" stroke="red" stroke-width="0.2">
+        <path d="M25,25 L36.231,25 L36.331,25 L36.331,28 L47.362,28 L47.362,25 L58.692,25 L58.792,25 L58.792,28 L69.823,28 L69.823,25 L81.154,25 L81.254,25 L81.254,28 L92.285,28 L92.285,25 L103.615,25 L103.715,25 L103.715,28 L114.746,28 L114.746,25 L126.077,25 L126.177,25 L126.177,28 L137.208,28 L137.208,25 L148.538,25 L148.638,25 L148.638,28 L159.669,28 L159.669,25 L171,25 L171,36.474 L171,36.574 L168,36.574 L168,47.847 L171,47.847 L171,59.421 L171,59.521 L168,59.521 L168,70.795 L171,70.795 L171,82.368 L171,82.468 L168,82.468 L168,93.742 L171,93.742 L171,105.316 L171,105.416 L168,105.416 L168,116.689 L171,116.689 L171,128.263 L171,128.363 L168,128.363 L168,139.637 L171,139.637 L171,151.211 L171,151.311 L168,151.311 L168,162.584 L171,162.584 L171,174.158 L171,174.258 L168,174.258 L168,185.532 L171,185.532 L171,197.105 L171,197.205 L168,197.205 L168,208.479 L171,208.479 L171,220.053 L171,220.153 L168,220.153 L168,231.426 L171,231.426 L171,243 L159.769,243 L159.669,243 L159.669,240 L148.638,240 L148.638,243 L137.308,243 L137.208,243 L137.208,240 L126.177,240 L126.177,243 L114.846,243 L114.746,243 L114.746,240 L103.715,240 L103.715,243 L92.385,243 L92.285,243 L92.285,240 L81.254,240 L81.254,243 L69.923,243 L69.823,243 L69.823,240 L58.792,240 L58.792,243 L47.462,243 L47.362,243 L47.362,240 L36.331,240 L36.331,243 L25,243 L25,231.526 L25,231.426 L28,231.426 L28,220.153 L25,220.153 L25,208.579 L25,208.479 L28,208.479 L28,197.205 L25,197.205 L25,185.632 L25,185.532 L28,185.532 L28,174.258 L25,174.258 L25,162.684 L25,162.584 L28,162.584 L28,151.311 L25,151.311 L25,139.737 L25,139.637 L28,139.637 L28,128.363 L25,128.363 L25,116.789 L25,116.689 L28,116.689 L28,105.416 L25,105.416 L25,93.842 L25,93.742 L28,93.742 L28,82.468 L25,82.468 L25,70.895 L25,70.795 L28,70.795 L28,59.521 L25,59.521 L25,47.947 L25,47.847 L28,47.847 L28,36.574 L25,36.574 L25,25Z M36.3,56.1 L159.7,56.1 A2,2 0 0,1 161.7,58.1 L161.7,227.7 A2,2 0 0,1 159.7,229.7 L36.3,229.7 A2,2 0 0,1 34.3,227.7 L34.3,58.1 A2,2 0 0,1 36.3,56.1Z M94.1,42 A3.9,3.9 0 1,0 101.9,42 A3.9,3.9 0 1,0 94.1,42Z" fill-rule="evenodd"/>
+      </g>
+      <g class="dim">
+      <line x1="25" y1="18" x2="25" y2="26"/>
+      <line x1="171" y1="18" x2="171" y2="26"/>
+      <line x1="25" y1="19" x2="171" y2="19" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="98" y="17" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333">146mm</text>
+    </g>
+    <g class="dim">
+      <line x1="18" y1="25" x2="26" y2="25"/>
+      <line x1="18" y1="243" x2="26" y2="243"/>
+      <line x1="19" y1="25" x2="19" y2="243" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="17" y="134" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333"
+            transform="rotate(-90,17,134)">218mm</text>
+    </g>
+    </svg>
+</div>
+<div class="page">
+<svg xmlns="http://www.w3.org/2000/svg"
+         width="196mm" height="268mm"
+         viewBox="0 0 196 268"
+         style="max-width:100%; max-height:250mm;" overflow="visible">
+      <defs>
+        <marker id="arr" markerWidth="3" markerHeight="3" refX="1.5" refY="1.5"
+                orient="auto-start-reverse" markerUnits="strokeWidth">
+          <path d="M0,0 L3,1.5 L0,3Z" fill="#333"/>
+        </marker>
+      </defs>
+      <text x="98" y="12.5" font-size="4.5" text-anchor="middle"
+            font-family="sans-serif" font-weight="bold" fill="#333">Back Plate  146.0 x 218.0 mm</text>
+      <g fill="none" stroke="red" stroke-width="0.2">
+        <path d="M25,25 L36.231,25 L36.331,25 L36.331,28 L47.362,28 L47.362,25 L58.692,25 L58.792,25 L58.792,28 L69.823,28 L69.823,25 L81.154,25 L81.254,25 L81.254,28 L92.285,28 L92.285,25 L103.615,25 L103.715,25 L103.715,28 L114.746,28 L114.746,25 L126.077,25 L126.177,25 L126.177,28 L137.208,28 L137.208,25 L148.538,25 L148.638,25 L148.638,28 L159.669,28 L159.669,25 L171,25 L171,36.474 L171,36.574 L168,36.574 L168,47.847 L171,47.847 L171,59.421 L171,59.521 L168,59.521 L168,70.795 L171,70.795 L171,82.368 L171,82.468 L168,82.468 L168,93.742 L171,93.742 L171,105.316 L171,105.416 L168,105.416 L168,116.689 L171,116.689 L171,128.263 L171,128.363 L168,128.363 L168,139.637 L171,139.637 L171,151.211 L171,151.311 L168,151.311 L168,162.584 L171,162.584 L171,174.158 L171,174.258 L168,174.258 L168,185.532 L171,185.532 L171,197.105 L171,197.205 L168,197.205 L168,208.479 L171,208.479 L171,220.053 L171,220.153 L168,220.153 L168,231.426 L171,231.426 L171,243 L159.769,243 L159.669,243 L159.669,240 L148.638,240 L148.638,243 L137.308,243 L137.208,243 L137.208,240 L126.177,240 L126.177,243 L114.846,243 L114.746,243 L114.746,240 L103.715,240 L103.715,243 L92.385,243 L92.285,243 L92.285,240 L81.254,240 L81.254,243 L69.923,243 L69.823,243 L69.823,240 L58.792,240 L58.792,243 L47.462,243 L47.362,243 L47.362,240 L36.331,240 L36.331,243 L25,243 L25,231.526 L25,231.426 L28,231.426 L28,220.153 L25,220.153 L25,208.579 L25,208.479 L28,208.479 L28,197.205 L25,197.205 L25,185.632 L25,185.532 L28,185.532 L28,174.258 L25,174.258 L25,162.684 L25,162.584 L28,162.584 L28,151.311 L25,151.311 L25,139.737 L25,139.637 L28,139.637 L28,128.363 L25,128.363 L25,116.789 L25,116.689 L28,116.689 L28,105.416 L25,105.416 L25,93.842 L25,93.742 L28,93.742 L28,82.468 L25,82.468 L25,70.895 L25,70.795 L28,70.795 L28,59.521 L25,59.521 L25,47.947 L25,47.847 L28,47.847 L28,36.574 L25,36.574 L25,25Z M57.85,87.5 A1.15,1.15 0 1,0 60.15,87.5 A1.15,1.15 0 1,0 57.85,87.5Z M57.85,136.5 A1.15,1.15 0 1,0 60.15,136.5 A1.15,1.15 0 1,0 57.85,136.5Z M115.85,87.5 A1.15,1.15 0 1,0 118.15,87.5 A1.15,1.15 0 1,0 115.85,87.5Z M115.85,136.5 A1.15,1.15 0 1,0 118.15,136.5 A1.15,1.15 0 1,0 115.85,136.5Z" fill-rule="evenodd"/>
+      </g>
+      <g class="dim">
+      <line x1="25" y1="18" x2="25" y2="26"/>
+      <line x1="171" y1="18" x2="171" y2="26"/>
+      <line x1="25" y1="19" x2="171" y2="19" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="98" y="17" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333">146mm</text>
+    </g>
+    <g class="dim">
+      <line x1="18" y1="25" x2="26" y2="25"/>
+      <line x1="18" y1="243" x2="26" y2="243"/>
+      <line x1="19" y1="25" x2="19" y2="243" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="17" y="134" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333"
+            transform="rotate(-90,17,134)">218mm</text>
+    </g>
+    </svg>
+</div>
+<div class="page">
+<svg xmlns="http://www.w3.org/2000/svg"
+         width="196mm" height="80mm"
+         viewBox="0 0 196 80"
+         style="max-width:100%; max-height:250mm;" overflow="visible">
+      <defs>
+        <marker id="arr" markerWidth="3" markerHeight="3" refX="1.5" refY="1.5"
+                orient="auto-start-reverse" markerUnits="strokeWidth">
+          <path d="M0,0 L3,1.5 L0,3Z" fill="#333"/>
+        </marker>
+      </defs>
+      <text x="98" y="12.5" font-size="4.5" text-anchor="middle"
+            font-family="sans-serif" font-weight="bold" fill="#333">Top Wall  146 x 30 mm</text>
+      <g fill="none" stroke="red" stroke-width="0.2">
+        <path d="M25,25 L36.231,25 L36.131,25 L36.131,22 L47.562,22 L47.562,25 L58.692,25 L58.592,25 L58.592,22 L70.023,22 L70.023,25 L81.154,25 L81.054,25 L81.054,22 L92.485,22 L92.485,25 L103.615,25 L103.515,25 L103.515,22 L114.946,22 L114.946,25 L126.077,25 L125.977,25 L125.977,22 L137.408,22 L137.408,25 L148.538,25 L148.438,25 L148.438,22 L159.869,22 L159.869,25 L171,25 L171,35 L171,34.9 L174,34.9 L174,45.1 L171,45.1 L171,55 L159.769,55 L159.869,55 L159.869,58 L148.438,58 L148.438,55 L137.308,55 L137.408,55 L137.408,58 L125.977,58 L125.977,55 L114.846,55 L114.946,55 L114.946,58 L103.515,58 L103.515,55 L92.385,55 L92.485,55 L92.485,58 L81.054,58 L81.054,55 L69.923,55 L70.023,55 L70.023,58 L58.592,58 L58.592,55 L47.462,55 L47.562,55 L47.562,58 L36.131,58 L36.131,55 L25,55 L25,45 L25,45.1 L22,45.1 L22,34.9 L25,34.9 L25,25Z"/>
+      </g>
+      <g class="dim">
+      <line x1="25" y1="18" x2="25" y2="26"/>
+      <line x1="171" y1="18" x2="171" y2="26"/>
+      <line x1="25" y1="19" x2="171" y2="19" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="98" y="17" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333">146mm</text>
+    </g>
+    <g class="dim">
+      <line x1="18" y1="25" x2="26" y2="25"/>
+      <line x1="18" y1="55" x2="26" y2="55"/>
+      <line x1="19" y1="25" x2="19" y2="55" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="17" y="40" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333"
+            transform="rotate(-90,17,40)">30mm</text>
+    </g>
+    </svg>
+</div>
+<div class="page">
+<svg xmlns="http://www.w3.org/2000/svg"
+         width="196mm" height="80mm"
+         viewBox="0 0 196 80"
+         style="max-width:100%; max-height:250mm;" overflow="visible">
+      <defs>
+        <marker id="arr" markerWidth="3" markerHeight="3" refX="1.5" refY="1.5"
+                orient="auto-start-reverse" markerUnits="strokeWidth">
+          <path d="M0,0 L3,1.5 L0,3Z" fill="#333"/>
+        </marker>
+      </defs>
+      <text x="98" y="12.5" font-size="4.5" text-anchor="middle"
+            font-family="sans-serif" font-weight="bold" fill="#333">Bottom Wall  146 x 30 mm  (USB-C cutout)</text>
+      <g fill="none" stroke="red" stroke-width="0.2">
+        <path d="M25,25 L36.231,25 L36.131,25 L36.131,22 L47.562,22 L47.562,25 L58.692,25 L58.592,25 L58.592,22 L70.023,22 L70.023,25 L81.154,25 L81.054,25 L81.054,22 L92.485,22 L92.485,25 L103.615,25 L103.515,25 L103.515,22 L114.946,22 L114.946,25 L126.077,25 L125.977,25 L125.977,22 L137.408,22 L137.408,25 L148.538,25 L148.438,25 L148.438,22 L159.869,22 L159.869,25 L171,25 L171,35 L171,34.9 L174,34.9 L174,45.1 L171,45.1 L171,55 L159.769,55 L159.869,55 L159.869,58 L148.438,58 L148.438,55 L137.308,55 L137.408,55 L137.408,58 L125.977,58 L125.977,55 L114.846,55 L114.946,55 L114.946,58 L103.515,58 L103.515,55 L92.385,55 L92.485,55 L92.485,58 L81.054,58 L81.054,55 L69.923,55 L70.023,55 L70.023,58 L58.592,58 L58.592,55 L47.462,55 L47.562,55 L47.562,58 L36.131,58 L36.131,55 L25,55 L25,45 L25,45.1 L22,45.1 L22,34.9 L25,34.9 L25,25Z M92.1,36.6 L103.9,36.6 L103.9,43.4 L92.1,43.4Z" fill-rule="evenodd"/>
+      </g>
+      <g class="dim">
+      <line x1="25" y1="18" x2="25" y2="26"/>
+      <line x1="171" y1="18" x2="171" y2="26"/>
+      <line x1="25" y1="19" x2="171" y2="19" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="98" y="17" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333">146mm</text>
+    </g>
+    <g class="dim">
+      <line x1="18" y1="25" x2="26" y2="25"/>
+      <line x1="18" y1="55" x2="26" y2="55"/>
+      <line x1="19" y1="25" x2="19" y2="55" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="17" y="40" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333"
+            transform="rotate(-90,17,40)">30mm</text>
+    </g>
+    </svg>
+</div>
+<div class="page">
+<svg xmlns="http://www.w3.org/2000/svg"
+         width="268mm" height="80mm"
+         viewBox="0 0 268 80"
+         style="max-width:100%; max-height:250mm;" overflow="visible">
+      <defs>
+        <marker id="arr" markerWidth="3" markerHeight="3" refX="1.5" refY="1.5"
+                orient="auto-start-reverse" markerUnits="strokeWidth">
+          <path d="M0,0 L3,1.5 L0,3Z" fill="#333"/>
+        </marker>
+      </defs>
+      <text x="134" y="12.5" font-size="4.5" text-anchor="middle"
+            font-family="sans-serif" font-weight="bold" fill="#333">Left Wall  218 x 30 mm  (rail groove)</text>
+      <g fill="none" stroke="red" stroke-width="0.2">
+        <path d="M25,25 L36.474,25 L36.374,25 L36.374,22 L48.047,22 L48.047,25 L59.421,25 L59.321,25 L59.321,22 L70.995,22 L70.995,25 L82.368,25 L82.268,25 L82.268,22 L93.942,22 L93.942,25 L105.316,25 L105.216,25 L105.216,22 L116.889,22 L116.889,25 L128.263,25 L128.163,25 L128.163,22 L139.837,22 L139.837,25 L151.211,25 L151.111,25 L151.111,22 L162.784,22 L162.784,25 L174.158,25 L174.058,25 L174.058,22 L185.732,22 L185.732,25 L197.105,25 L197.005,25 L197.005,22 L208.679,22 L208.679,25 L220.053,25 L219.953,25 L219.953,22 L231.626,22 L231.626,25 L243,25 L243,35 L243,34.9 L246,34.9 L246,45.1 L243,45.1 L243,55 L231.526,55 L231.626,55 L231.626,58 L219.953,58 L219.953,55 L208.579,55 L208.679,55 L208.679,58 L197.005,58 L197.005,55 L185.632,55 L185.732,55 L185.732,58 L174.058,58 L174.058,55 L162.684,55 L162.784,55 L162.784,58 L151.111,58 L151.111,55 L139.737,55 L139.837,55 L139.837,58 L128.163,58 L128.163,55 L116.789,55 L116.889,55 L116.889,58 L105.216,58 L105.216,55 L93.842,55 L93.942,55 L93.942,58 L82.268,58 L82.268,55 L70.895,55 L70.995,55 L70.995,58 L59.321,58 L59.321,55 L47.947,55 L48.047,55 L48.047,58 L36.374,58 L36.374,55 L25,55 L25,45 L25,45.1 L22,45.1 L22,34.9 L25,34.9 L25,25Z"/>
+      </g>
+      <g class="dim">
+      <line x1="25" y1="18" x2="25" y2="26"/>
+      <line x1="243" y1="18" x2="243" y2="26"/>
+      <line x1="25" y1="19" x2="243" y2="19" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="134" y="17" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333">218mm</text>
+    </g>
+    <g class="dim">
+      <line x1="18" y1="25" x2="26" y2="25"/>
+      <line x1="18" y1="55" x2="26" y2="55"/>
+      <line x1="19" y1="25" x2="19" y2="55" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="17" y="40" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333"
+            transform="rotate(-90,17,40)">30mm</text>
+    </g>
+    </svg>
+</div>
+<div class="page">
+<svg xmlns="http://www.w3.org/2000/svg"
+         width="268mm" height="80mm"
+         viewBox="0 0 268 80"
+         style="max-width:100%; max-height:250mm;" overflow="visible">
+      <defs>
+        <marker id="arr" markerWidth="3" markerHeight="3" refX="1.5" refY="1.5"
+                orient="auto-start-reverse" markerUnits="strokeWidth">
+          <path d="M0,0 L3,1.5 L0,3Z" fill="#333"/>
+        </marker>
+      </defs>
+      <text x="134" y="12.5" font-size="4.5" text-anchor="middle"
+            font-family="sans-serif" font-weight="bold" fill="#333">Right Wall  218 x 30 mm  (rail + button)</text>
+      <g fill="none" stroke="red" stroke-width="0.2">
+        <path d="M25,25 L36.474,25 L36.374,25 L36.374,22 L48.047,22 L48.047,25 L59.421,25 L59.321,25 L59.321,22 L70.995,22 L70.995,25 L82.368,25 L82.268,25 L82.268,22 L93.942,22 L93.942,25 L105.316,25 L105.216,25 L105.216,22 L116.889,22 L116.889,25 L128.263,25 L128.163,25 L128.163,22 L139.837,22 L139.837,25 L151.211,25 L151.111,25 L151.111,22 L162.784,22 L162.784,25 L174.158,25 L174.058,25 L174.058,22 L185.732,22 L185.732,25 L197.105,25 L197.005,25 L197.005,22 L208.679,22 L208.679,25 L220.053,25 L219.953,25 L219.953,22 L231.626,22 L231.626,25 L243,25 L243,35 L243,34.9 L246,34.9 L246,45.1 L243,45.1 L243,55 L231.526,55 L231.626,55 L231.626,58 L219.953,58 L219.953,55 L208.579,55 L208.679,55 L208.679,58 L197.005,58 L197.005,55 L185.632,55 L185.732,55 L185.732,58 L174.058,58 L174.058,55 L162.684,55 L162.784,55 L162.784,58 L151.111,58 L151.111,55 L139.737,55 L139.837,55 L139.837,58 L128.163,58 L128.163,55 L116.789,55 L116.889,55 L116.889,58 L105.216,58 L105.216,55 L93.842,55 L93.942,55 L93.942,58 L82.268,58 L82.268,55 L70.895,55 L70.995,55 L70.995,58 L59.321,58 L59.321,55 L47.947,55 L48.047,55 L48.047,58 L36.374,58 L36.374,55 L25,55 L25,45 L25,45.1 L22,45.1 L22,34.9 L25,34.9 L25,25Z M128.1,40 A5.9,5.9 0 1,0 139.9,40 A5.9,5.9 0 1,0 128.1,40Z" fill-rule="evenodd"/>
+      </g>
+      <g class="dim">
+      <line x1="25" y1="18" x2="25" y2="26"/>
+      <line x1="243" y1="18" x2="243" y2="26"/>
+      <line x1="25" y1="19" x2="243" y2="19" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="134" y="17" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333">218mm</text>
+    </g>
+    <g class="dim">
+      <line x1="18" y1="25" x2="26" y2="25"/>
+      <line x1="18" y1="55" x2="26" y2="55"/>
+      <line x1="19" y1="25" x2="19" y2="55" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="17" y="40" font-size="4" text-anchor="middle" font-family="sans-serif" fill="#333"
+            transform="rotate(-90,17,40)">30mm</text>
+    </g>
+    </svg>
+</div>
+</body>
+</html>
