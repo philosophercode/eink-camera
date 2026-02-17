@@ -475,47 +475,43 @@ into the new scene with proper lighting and shadows."""
         gallery = GalleryBrowser(self.display, self.screen, self.save_dir)
         gallery.run(gpio_chip=gpio_chip, gpio_pin=gpio_pin)
 
-    def show_style_banner(self):
-        """Show current style as banner on display."""
-        self.screen.show_style_banner(self.style, DREAM_STYLES[self.style])
-
-    def cycle_style(self, show_banner=False):
-        """Cycle through dream styles."""
+    def cycle_style(self):
+        """Cycle to next dream style (keyboard shortcut)."""
         styles = list(DREAM_STYLES.keys())
         idx = styles.index(self.style)
         self.style = styles[(idx + 1) % len(styles)]
         print(f"\rStyle: {self.style}\r\n\r  {DREAM_STYLES[self.style][:50]}...\r\n", end='', flush=True)
-        if show_banner:
-            self.show_style_banner()
+
+    def _restore_or_capture_mode(self):
+        """Show last dream image or capture mode screen."""
+        if self.last_image:
+            self.display.show_image(self.last_image, mode=MODE_GC16)
+        else:
+            self.screen.show_capture_mode()
 
     def run(self, gpio_pin=None):
-        """Main interactive loop with optional GPIO button support."""
+        """
+        Main interactive loop.
+
+        Button controls:
+          1 click  - Capture and dream
+          2 clicks - Gallery mode
+          Hold     - Style carousel (cycles while held, selects on release)
+        """
         print("\n=== AI Dream Camera ===")
         print(f"Display: {self.width}x{self.height}")
         print(f"Style: {self.style}")
         if HAS_TTY:
             print("\nControls:")
-            print("  1 / short press  - Capture and dream")
-            print("  s / hold 1.5s    - Enter style mode")
-            print("      (press to cycle, double-click or wait to confirm)")
-            print("  g / triple-click - Gallery (browse dreams)")
-            print("  3 - Side-by-side")
-            print("  2 - Stream")
-            print("  c - Clear")
-            print("  r - Reset display (if frozen)")
-            print("  q - Quit")
+            print("  1 / click    - Capture and dream")
+            print("  g / 2x click - Gallery")
+            print("  s / hold     - Style carousel")
+            print("  c - Clear | r - Reset | q - Quit")
         else:
             print("(No TTY - GPIO-only mode)")
 
-        # Set up GPIO button if specified
+        # Set up GPIO button
         gpio_chip = None
-        last_button_state = 1
-        button_press_time = 0
-        click_count = 0
-        last_click_time = 0
-        style_mode = False
-        style_mode_start = 0
-        last_style_press = 0
         if gpio_pin is not None:
             try:
                 import lgpio
@@ -531,9 +527,22 @@ into the new scene with proper lighting and shadows."""
 
         print("")
 
-        # Show splash screen and capture mode (each does MODE_INIT clear first)
+        # Show splash screen and capture mode
         self.screen.show_splash("Digital Polaroid", duration=2.5)
         self.screen.show_capture_mode()
+
+        # Button state
+        last_btn = 1
+        btn_time = 0
+        click_count = 0
+        last_click_time = 0
+        carousel_mode = False
+        carousel_idx = 0
+        carousel_last_advance = 0
+
+        # Style carousel data
+        style_names = list(DREAM_STYLES.keys())
+        style_descs = list(DREAM_STYLES.values())
 
         # Set terminal to raw mode if TTY available
         old_settings = None
@@ -553,98 +562,78 @@ into the new scene with proper lighting and shadows."""
                         break
                     elif key == '1':
                         self.dream_and_display(side_by_side=False)
-                    elif key == '3':
-                        self.dream_and_display(side_by_side=True)
-                    elif key == '2':
-                        self.stream_dreams()
                     elif key == 's':
                         self.cycle_style()
+                    elif key == 'g':
+                        self.gallery_mode(gpio_chip, gpio_pin)
+                        self._restore_or_capture_mode()
                     elif key == 'c':
                         print("\r\nClearing...\r\n", end='', flush=True)
                         self.display.clear()
                         self.screen.show_capture_mode()
-                        print("\rDone!\r\n", end='', flush=True)
-                    elif key == 'g':
-                        self.gallery_mode(gpio_chip, gpio_pin)
-                        if self.last_image:
-                            self.display.show_image(self.last_image, mode=MODE_GC16)
-                        else:
-                            self.screen.show_capture_mode()
                     elif key == 'r':
                         print("\r\nResetting display...\r\n", end='', flush=True)
                         self.display.reset()
                         self.screen.show_capture_mode()
-                        print("\rDone!\r\n", end='', flush=True)
 
-                # Check GPIO button with style mode
+                # GPIO button state machine
                 if gpio_chip is not None:
                     import lgpio
                     state = lgpio.gpio_read(gpio_chip, gpio_pin)
                     now = time.time()
 
-                    if not style_mode:
+                    if not carousel_mode:
                         # Normal mode
-                        if last_button_state == 1 and state == 0:
-                            # Button pressed - start timing
-                            button_press_time = now
+                        if last_btn == 1 and state == 0:
+                            # Button pressed
+                            btn_time = now
 
-                        elif last_button_state == 0 and state == 0:
-                            # Button still held - check for long press
-                            if now - button_press_time >= 1.5 and not style_mode:
-                                # Enter style mode
+                        elif last_btn == 0 and state == 0:
+                            # Still held - enter carousel at 1.5s
+                            if now - btn_time >= 1.5:
                                 click_count = 0
-                                style_mode = True
-                                style_mode_start = now
-                                last_style_press = now
-                                print("\r\n[Style Mode]\r\n", end='', flush=True)
-                                self.show_style_banner()
+                                carousel_mode = True
+                                carousel_idx = style_names.index(self.style)
+                                carousel_last_advance = now
+                                print("\r\n[Style carousel]\r\n", end='', flush=True)
+                                self.screen.show_style_carousel(
+                                    style_names, style_descs, carousel_idx,
+                                    first_frame=True)
 
-                        elif last_button_state == 0 and state == 1:
-                            # Button released - count clicks
-                            if now - button_press_time < 1.5:
+                        elif last_btn == 0 and state == 1:
+                            # Released (short press) - count click
+                            if now - btn_time < 1.5:
                                 click_count += 1
                                 last_click_time = now
-                                if click_count >= 3:
-                                    print("\r\n[Gallery]\r\n", end='', flush=True)
-                                    self.gallery_mode(gpio_chip, gpio_pin)
-                                    if self.last_image:
-                                        self.display.show_image(self.last_image, mode=MODE_GC16)
-                                    else:
-                                        self.screen.show_capture_mode()
-                                    click_count = 0
 
                     else:
-                        # Style mode - each press cycles, timeout or double-click exits
-                        if last_button_state == 1 and state == 0:
-                            # Button pressed in style mode
-                            if now - last_style_press < 0.4:
-                                # Double click - exit style mode
-                                print("\r\n[Style confirmed]\r\n", end='', flush=True)
-                                style_mode = False
-                                if self.last_image:
-                                    self.display.show_image(self.last_image, mode=MODE_A2)
-                                else:
-                                    self.screen.show_capture_mode()
-                            else:
-                                # Single press - cycle style
-                                self.cycle_style(show_banner=True)
-                                last_style_press = now
+                        # Carousel mode - cycle while held, select on release
+                        if state == 0:
+                            # Still held - advance every 0.8s
+                            if now - carousel_last_advance >= 0.8:
+                                carousel_idx = (carousel_idx + 1) % len(style_names)
+                                carousel_last_advance = now
+                                self.screen.show_style_carousel(
+                                    style_names, style_descs, carousel_idx)
 
-                        # Timeout - exit style mode after 3 seconds of no input
-                        if now - last_style_press > 3.0:
-                            print("\r\n[Style confirmed]\r\n", end='', flush=True)
-                            style_mode = False
-                            if self.last_image:
-                                self.display.show_image(self.last_image, mode=MODE_A2)
-                            else:
-                                self.screen.show_capture_mode()
+                        elif last_btn == 0 and state == 1:
+                            # Released - select current style
+                            self.style = style_names[carousel_idx]
+                            carousel_mode = False
+                            print(f"\r\n[Style: {self.style}]\r\n", end='', flush=True)
+                            self._restore_or_capture_mode()
 
-                    last_button_state = state
+                    last_btn = state
 
-                    # Click timeout - pending clicks become a capture
-                    if click_count > 0 and now - last_click_time > 0.5:
-                        print("\r\n[Capture]\r\n", end='', flush=True)
-                        self.dream_and_display(side_by_side=False)
+                    # Click timeout - process pending clicks
+                    if not carousel_mode and click_count > 0 and now - last_click_time > 0.4:
+                        if click_count == 1:
+                            print("\r\n[Capture]\r\n", end='', flush=True)
+                            self.dream_and_display(side_by_side=False)
+                        elif click_count >= 2:
+                            print("\r\n[Gallery]\r\n", end='', flush=True)
+                            self.gallery_mode(gpio_chip, gpio_pin)
+                            self._restore_or_capture_mode()
                         click_count = 0
 
                 # If no TTY and no GPIO, just sleep to avoid busy loop

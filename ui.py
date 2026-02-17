@@ -72,8 +72,8 @@ class ScreenRenderer:
         """Idle screen with instructions."""
         self.show_screen(
             "Capture Mode",
-            subtitle="Press trigger to capture",
-            body="Hold: styles | Triple-click: gallery",
+            subtitle="Press to capture",
+            body="2x: gallery | Hold: styles",
         )
 
     def show_gallery_splash(self, total_images):
@@ -81,13 +81,12 @@ class ScreenRenderer:
         self.show_screen(
             "Gallery Mode",
             subtitle=f"{total_images} images",
-            body="Click: play/pause | 2x click: back | Hold: exit",
+            body="Click: next | 2x: prev | Hold: exit",
         )
         time.sleep(3)
 
     def show_overlay(self, text, duration=1.0):
-        """Brief text overlay for status feedback (e.g. 'Paused')."""
-        # Render overlay in center band
+        """Brief text overlay for status feedback."""
         band_h = 160
         band_y = (self.height - band_h) // 2
         img = Image.new('L', (self.width, band_h), 255)
@@ -99,18 +98,47 @@ class ScreenRenderer:
                              w=self.width, h=band_h, mode=MODE_A2)
         time.sleep(duration)
 
-    def show_style_banner(self, name, desc):
-        """Show style name and description. Full clear first."""
-        self.display.clear(MODE_INIT)
+    def show_style_carousel(self, style_names, style_descs, current_idx, first_frame=False):
+        """
+        Show vertical carousel with prev / CURRENT / next style.
+
+        Uses MODE_INIT on first frame for clean entry, MODE_A2 for cycling.
+        """
+        total = len(style_names)
+        prev_idx = (current_idx - 1) % total
+        next_idx = (current_idx + 1) % total
+
+        if first_frame:
+            self.display.clear(MODE_INIT)
 
         img = Image.new('L', (self.width, self.height), 255)
         draw = ImageDraw.Draw(img)
+        cy = self.height // 2
 
-        draw.text((self.width // 2, self.height // 2 - 50),
-                  f"[ {name.upper()} ]", anchor="mm", font=self.font_big, fill=0)
+        # Previous style (faded)
+        draw.text((self.width // 2, cy - 250),
+                  style_names[prev_idx].upper(),
+                  anchor="mm", font=self.font_med, fill=180)
 
-        short_desc = desc[:60] + "..."
-        draw.text((self.width // 2, self.height // 2 + 80),
-                  short_desc, anchor="mm", font=self.font_small, fill=80)
+        # Divider
+        draw.line([(300, cy - 150), (self.width - 300, cy - 150)], fill=160, width=2)
+
+        # Current style (bold, large)
+        draw.text((self.width // 2, cy - 30),
+                  style_names[current_idx].upper(),
+                  anchor="mm", font=self.font_big, fill=0)
+
+        # Description
+        short_desc = style_descs[current_idx][:55] + "..."
+        draw.text((self.width // 2, cy + 70),
+                  short_desc, anchor="mm", font=self.font_small, fill=100)
+
+        # Divider
+        draw.line([(300, cy + 150), (self.width - 300, cy + 150)], fill=160, width=2)
+
+        # Next style (faded)
+        draw.text((self.width // 2, cy + 250),
+                  style_names[next_idx].upper(),
+                  anchor="mm", font=self.font_med, fill=180)
 
         self.display.show_image(img, mode=MODE_A2)

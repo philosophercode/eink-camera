@@ -9,7 +9,7 @@ from eink import MODE_GC16
 
 
 class GalleryBrowser:
-    """Browse saved dream images with slideshow support."""
+    """Browse saved dream images."""
 
     def __init__(self, display, screen, dreams_dir):
         self.display = display
@@ -43,11 +43,11 @@ class GalleryBrowser:
         Main gallery loop.
 
         Controls:
-          - Single click: toggle slideshow on/off
-          - Double click: previous image (also pauses)
+          - Single click: next image
+          - Double click: previous image
           - Long press (1.5s): exit gallery
 
-        Returns when user exits.
+        Auto-advances every 60s when idle.
         """
         images = self.load_images()
         if not images:
@@ -58,12 +58,10 @@ class GalleryBrowser:
         self.screen.show_gallery_splash(total)
 
         idx = 0
-        slideshow = False
         last_advance = time.time()
-
         self._show_image(idx)
 
-        # GPIO state
+        # Button state
         last_btn = 1
         btn_time = 0
         click_count = 0
@@ -72,8 +70,8 @@ class GalleryBrowser:
         while True:
             now = time.time()
 
-            # Auto-advance in slideshow mode
-            if slideshow and now - last_advance >= 60:
+            # Auto-advance every 60s when idle
+            if now - last_advance >= 60:
                 idx = (idx + 1) % total
                 self._show_image(idx)
                 last_advance = now
@@ -83,15 +81,14 @@ class GalleryBrowser:
                 state = lgpio.gpio_read(gpio_chip, gpio_pin)
 
                 if last_btn == 1 and state == 0:
-                    # Button pressed
                     btn_time = now
-                elif last_btn == 0 and state == 1:
-                    # Button released
-                    hold_duration = now - btn_time
-                    if hold_duration >= 1.5:
-                        # Long press - exit gallery
+                elif last_btn == 0 and state == 0:
+                    # Still held - check for long press
+                    if now - btn_time >= 1.5:
                         break
-                    else:
+                elif last_btn == 0 and state == 1:
+                    # Released
+                    if now - btn_time < 1.5:
                         click_count += 1
                         last_click_time = now
 
@@ -100,51 +97,31 @@ class GalleryBrowser:
                 # Process clicks after timeout
                 if click_count > 0 and now - last_click_time > 0.4:
                     if click_count == 1:
-                        # Single click - toggle slideshow
-                        slideshow = not slideshow
-                        if slideshow:
-                            self.screen.show_overlay("Slideshow", duration=0.8)
-                            self._show_image(idx)  # Restore image after overlay
-                            last_advance = now
-                        else:
-                            self.screen.show_overlay("Paused", duration=0.8)
-                            self._show_image(idx)
+                        idx = (idx + 1) % total
+                        self._show_image(idx)
+                        last_advance = now
                     elif click_count >= 2:
-                        # Double click - previous image (and pause)
-                        slideshow = False
                         idx = (idx - 1) % total
                         self._show_image(idx)
+                        last_advance = now
                     click_count = 0
 
-            # Also check keyboard if TTY is available
+            # Keyboard fallback
             try:
                 import select, sys
                 if select.select([sys.stdin], [], [], 0.05)[0]:
                     key = sys.stdin.read(1)
                     if key in ('q', 'g'):
                         break
-                    elif key == ' ':
-                        # Space toggles slideshow
-                        slideshow = not slideshow
-                        if slideshow:
-                            self.screen.show_overlay("Slideshow", duration=0.8)
-                            self._show_image(idx)
-                            last_advance = now
-                        else:
-                            self.screen.show_overlay("Paused", duration=0.8)
-                            self._show_image(idx)
-                    elif key == 'p':
-                        # Previous
-                        slideshow = False
-                        idx = (idx - 1) % total
-                        self._show_image(idx)
-                    elif key == 'n':
-                        # Next
+                    elif key in ('n', ' ', '\r'):
                         idx = (idx + 1) % total
                         self._show_image(idx)
                         last_advance = now
+                    elif key == 'p':
+                        idx = (idx - 1) % total
+                        self._show_image(idx)
+                        last_advance = now
             except (termios_error, ValueError):
-                # No TTY available - just sleep for polling
                 time.sleep(0.05)
 
         print("\r[Exit gallery]\r\n", end='', flush=True)
