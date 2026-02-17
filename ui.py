@@ -72,7 +72,7 @@ class ScreenRenderer:
         self.show_screen(
             "Capture",
             subtitle="Press to capture",
-            body="2x: gallery | Hold: styles",
+            body="2x: styles | Hold: switch mode",
         )
 
     def show_gallery_mode(self, total_images):
@@ -80,7 +80,16 @@ class ScreenRenderer:
         self.show_screen(
             "Gallery",
             subtitle=f"{total_images} images",
-            body="Click: next | 2x: prev | Hold: exit",
+            body="Click: next | 2x: prev | Hold: switch",
+        )
+        time.sleep(2)
+
+    def show_slideshow_mode(self, total_images):
+        """Slideshow entry screen."""
+        self.show_screen(
+            "Slideshow",
+            subtitle=f"{total_images} images",
+            body="Click: pause/play | Hold: switch",
         )
         time.sleep(2)
 
