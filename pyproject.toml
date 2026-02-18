@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dreamcam"
+version = "0.1.0"
+description = "AI dream camera for Raspberry Pi with e-ink display"
+requires-python = ">=3.10"
+dependencies = [
+    "pillow>=9.0",
+]
+
+[project.optional-dependencies]
+ai = [
+    "google-genai>=1.0",
+    "python-dotenv>=1.0",
+]
+gpio = [
+    "lgpio>=0.2",
+]
+all = [
+    "dreamcam[ai,gpio]",
+]
+dev = [
+    "dreamcam[all]",
+    "pytest>=7.0",
+]
+
+[project.scripts]
+dreamcam = "dreamcam.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["dreamcam*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

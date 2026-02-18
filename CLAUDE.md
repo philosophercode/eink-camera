@@ -16,42 +16,98 @@ sudo ./camera /dev/sda        # Run (requires root for SCSI device access)
 
 ### Python application (AI dream camera)
 ```bash
-pip install -r requirements.txt   # Pillow, google-genai, python-dotenv, lgpio
+pip install -e ".[all]"           # Install package with all extras
 export GOOGLE_API_KEY="..."       # Required for Gemini AI features
-sudo ./dream /dev/sg0             # Launch via wrapper script
-sudo python3 dream_camera.py /dev/sg0   # Or run directly
+sudo dreamcam /dev/sg0            # Run via CLI entry point
+sudo python -m dreamcam /dev/sg0  # Or run as module
+sudo ./dream /dev/sg0             # Or via wrapper script
+```
+
+### Simulator mode (no hardware needed)
+```bash
+pip install -e "."                           # Base package only (just pillow)
+python -m dreamcam --backend sim             # Run with simulated display
+python -m dreamcam --sim-dir ./frames        # Save frames to disk
+```
+
+### Tests
+```bash
+pip install -e ".[dev]"     # Install with dev dependencies
+pytest                      # Run all tests (no hardware needed)
+pytest -v                   # Verbose output
 ```
 
 ## Architecture
 
-Two parallel implementations exist — a C version (simpler, no AI) and a Python version (full-featured):
+### Package structure (`dreamcam/`)
 
-### IT8951 USB Display Driver
-- **C**: `it8951_usb.c` / `it8951_usb.h` — SCSI commands via Linux SG_IO ioctl to IT8951 controller
-- **Python**: `eink.py` — `EInkDisplay` class, same protocol using ctypes for SG_IO structs. This is the active driver used by all Python code.
+```
+dreamcam/
+├── __init__.py        # Version
+├── __main__.py        # CLI entry point (argparse + bootstrap)
+├── app.py             # DreamCamera orchestrator — wires all components
+├── styles.py          # Style registry with categories (ART, ENV, TEXT, FRAME)
+├── transform.py       # Gemini AI client (image generation + text generation)
+├── input.py           # Input manager (keyboard + GPIO state machine)
+├── ui.py              # Screen renderer for e-ink UI screens
+├── gallery.py         # Gallery browser for saved dream images
+└── display/
+    ├── __init__.py    # Display protocol + mode constants + factory
+    ├── usb.py         # IT8951 USB/SCSI driver (production)
+    └── sim.py         # PIL-based simulator (development + testing)
+```
 
-Both drivers communicate with the IT8951 e-ink controller over USB mass storage (SCSI generic interface at `/dev/sg0` or `/dev/sda`). Image data is sent in chunks (max 60800 bytes per transfer) using custom SCSI vendor commands (0xfe prefix). The protocol uses big-endian for coordinates but little-endian for the image buffer address.
+### Display Protocol (`dreamcam/display/`)
+All display backends implement the `Display` protocol: `show_image()`, `display()` (partial), `clear()`, `reset()`, `close()`. Use `create_display('usb')` or `create_display('sim')` factory.
 
-### Display Modes
-Defined in both drivers: `MODE_INIT` (0, full clear), `MODE_DU` (1, fast 1-bit), `MODE_GC16` (2, 16-level grayscale), `MODE_A2` (4, fast B&W for animation).
+Display modes: `MODE_INIT` (0, full clear), `MODE_DU` (1, fast 1-bit), `MODE_GC16` (2, 16-level grayscale), `MODE_A2` (4, fast B&W for animation).
 
-### Dream Camera (`dream_camera.py`)
-`DreamCamera` class orchestrates: capture via `libcamera-still` -> Gemini API image transformation -> e-ink display. Supports two transform types: **environment styles** (change background, e.g. jungle/space/tokyo) and **art styles** (transform rendering, e.g. clay/pencil/watercolor). Uses `nano-banana-pro-preview` model for image generation. Has a loading spinner animation during AI processing using partial A2 refreshes. Auto-resets display every 10 captures to prevent e-ink freezing.
+The USB driver (`usb.py`) sends SCSI vendor commands (0xfe prefix) via Linux SG_IO ioctl. Image data in chunks (max 60800 bytes). Big-endian coordinates, little-endian buffer address.
+
+### Style System (`styles.py`)
+Styles are `Style` dataclasses with `name`, `category`, and `prompt`. Categories:
+- **ART**: Transform image style (clay, pencil, comic, etc.)
+- **FRAME**: Creative framing (wanted poster, trading card, newspaper)
+- **ENV**: Change background (jungle, space, tokyo)
+- **TEXT**: Generate text about photo (poem, haiku, roast)
+
+Add a style: one `Style(...)` line in `STYLES` list. Add a category: one constant + styles using it.
+
+### Transformer (`transform.py`)
+All Gemini API interaction. `Transformer.dream(image, style)` for images, `.generate_text(image, style)` for text modes. Lazy-loads google-genai (deferred import) so the package works without it installed.
+
+### Input Manager (`input.py`)
+Unified keyboard + GPIO with `poll() -> event` interface. Events: `CLICK`, `DOUBLE_CLICK`, `HOLD`, `QUIT`, `KEY_*`. Encapsulates button debounce, hold detection, click counting.
+
+### App Orchestrator (`app.py`)
+`DreamCamera` class wires display, transformer, input, UI, and gallery. Pipeline: capture via libcamera-still -> preview on e-ink -> spinner animation -> AI transform -> display result. Three operational modes: Capture, Gallery, Slideshow.
 
 ### GPIO Button Support
-Physical button on GPIO17 (configurable) with pull-up resistor. Short press = capture, long hold (1.5s) = enter style cycling mode, double-click or timeout = confirm style.
+Physical button on GPIO17 (configurable) with pull-up resistor. Short press = capture, long hold (1.5s) = enter mode carousel, double-click = browse styles.
 
 ### Other Files
-- `runner.py` — Animated sprite demo (Donkey Kong-style runner with flips) for testing e-ink refresh rates
-- `example_simple.py` — Minimal usage examples (test pattern, capture, display image)
+- `runner.py` — Animated sprite demo for testing e-ink refresh rates
+- `example_simple.py` — Minimal usage examples (test pattern, capture, display)
 - `dream` / `dcam` — Bash launcher scripts that activate the venv
+- C files (`camera.c`, `it8951_usb.c/.h`) — Standalone C implementation (no AI)
+
+## Packaging
+
+Uses `pyproject.toml` with optional dependency groups:
+- Base: `pillow` (always needed)
+- `[ai]`: `google-genai`, `python-dotenv`
+- `[gpio]`: `lgpio`
+- `[all]`: Everything
+- `[dev]`: All + pytest
+
+Entry point: `dreamcam` CLI command or `python -m dreamcam`.
 
 ## Hardware Requirements
 
 - Raspberry Pi (Pi 5 uses gpiochip4, older Pi uses gpiochip0)
 - IT8951-based e-ink display (1872x1404 resolution) connected via USB
 - Pi Camera Module (accessed via `libcamera-still`)
-- ImageMagick `convert` command (C version only, for image processing)
+- ImageMagick `convert` command (C version only)
 
 ## Remote Access (Raspberry Pi 5)
 
@@ -64,7 +120,7 @@ Physical button on GPIO17 (configurable) with pull-up resistor. Short press = ca
 
 ## Key Conventions
 
-- All display operations require `sudo` (SCSI device access)
+- All display operations require `sudo` (SCSI device access) — except simulator mode
 - E-ink device path varies: `/dev/sg0` (Python/SCSI generic) or `/dev/sda` (C version)
 - Images are always 8-bit grayscale, 1 byte per pixel
 - Python code uses a venv at `./venv/`
