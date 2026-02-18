@@ -11,7 +11,8 @@ import sys
 import time
 from PIL import Image, ImageDraw
 
-from eink import EInkDisplay, MODE_A2
+from dreamcam.display import MODE_A2
+from dreamcam.display.usb import USBDisplay as EInkDisplay
 
 # Bigger sprite with more detail
 SPRITE_RUN_R = [

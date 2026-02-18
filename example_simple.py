@@ -10,7 +10,8 @@ Usage:
 import sys
 import subprocess
 from PIL import Image, ImageDraw, ImageFont
-from eink import EInkDisplay, MODE_GC16, MODE_A2, MODE_INIT
+from dreamcam.display import MODE_GC16, MODE_A2, MODE_INIT
+from dreamcam.display.usb import USBDisplay as EInkDisplay
 
 
 def create_test_pattern(width, height):

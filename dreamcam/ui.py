@@ -1,16 +1,28 @@
-#!/usr/bin/env python3
 """Screen renderer for e-ink camera UI."""
 
+from __future__ import annotations
+
 import time
+from typing import TYPE_CHECKING
+
 from PIL import Image, ImageDraw, ImageFont
 
-from eink import MODE_A2, MODE_GC16, MODE_INIT
+from dreamcam.display import MODE_A2, MODE_GC16, MODE_INIT
+
+if TYPE_CHECKING:
+    from dreamcam.display import Display
+
+# Font search paths (most common Linux locations)
+FONT_PATHS = [
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+]
 
 
 class ScreenRenderer:
     """Renders text screens and overlays on the e-ink display."""
 
-    def __init__(self, display):
+    def __init__(self, display: Display):
         self.display = display
         self.width = display.width
         self.height = display.height
@@ -18,38 +30,22 @@ class ScreenRenderer:
 
     def _load_fonts(self):
         """Load fonts with fallback chain."""
-        font_paths = [
-            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        ]
         self.font_big = None
-        self.font_med = None
-        self.font_small = None
-
-        for path in font_paths:
+        for path in FONT_PATHS:
             try:
                 self.font_big = ImageFont.truetype(path, 120)
                 self.font_med = ImageFont.truetype(path, 64)
                 self.font_small = ImageFont.truetype(path, 40)
+                self.font_body = ImageFont.truetype(path, 36)
                 break
             except (IOError, OSError):
                 continue
 
-        # PIL default fallback
         if self.font_big is None:
             self.font_big = ImageFont.load_default()
             self.font_med = self.font_big
             self.font_small = self.font_big
             self.font_body = self.font_big
-            return
-
-        # Body font for dense readable text (text modes)
-        for path in font_paths:
-            try:
-                self.font_body = ImageFont.truetype(path, 36)
-                break
-            except (IOError, OSError):
-                continue
 
     def show_screen(self, title, subtitle=None, body=None, mode=MODE_A2):
         """General centered text screen. Full clear first to prevent ghosting."""
@@ -65,7 +61,6 @@ class ScreenRenderer:
         if subtitle:
             draw.text((self.width // 2, y_title + 100), subtitle,
                       anchor="mm", font=self.font_med, fill=60)
-
         if body:
             draw.text((self.width // 2, y_title + 180), body,
                       anchor="mm", font=self.font_small, fill=100)
@@ -86,21 +81,13 @@ class ScreenRenderer:
         )
 
     def show_gallery_mode(self, total_images):
-        """Gallery entry screen."""
-        self.show_screen(
-            "Gallery",
-            subtitle=f"{total_images} images",
-            body="Click: next | 2x: prev | Hold: switch",
-        )
+        self.show_screen("Gallery", subtitle=f"{total_images} images",
+                         body="Click: next | 2x: prev | Hold: switch")
         time.sleep(2)
 
     def show_slideshow_mode(self, total_images):
-        """Slideshow entry screen."""
-        self.show_screen(
-            "Slideshow",
-            subtitle=f"{total_images} images",
-            body="Click: pause/play | Hold: switch",
-        )
+        self.show_screen("Slideshow", subtitle=f"{total_images} images",
+                         body="Click: pause/play | Hold: switch")
         time.sleep(2)
 
     def show_overlay(self, text, duration=1.0):
@@ -111,18 +98,13 @@ class ScreenRenderer:
         draw = ImageDraw.Draw(img)
         draw.text((self.width // 2, band_h // 2), text,
                   anchor="mm", font=self.font_big, fill=0)
-
         self.display.display(img.tobytes(), x=0, y=band_y,
                              w=self.width, h=band_h, mode=MODE_A2)
         time.sleep(duration)
 
-    def show_style_carousel(self, style_names, style_descs, current_idx, first_frame=False):
-        """
-        Vertical carousel: prev / CURRENT / next style.
-
-        MODE_INIT on first frame for clean entry, MODE_A2 for cycling.
-        """
-        total = len(style_names)
+    def show_style_carousel(self, names, descs, current_idx, first_frame=False):
+        """Vertical carousel: prev / CURRENT / next."""
+        total = len(names)
         prev_idx = (current_idx - 1) % total
         next_idx = (current_idx + 1) % total
 
@@ -133,34 +115,62 @@ class ScreenRenderer:
         draw = ImageDraw.Draw(img)
         cy = self.height // 2
 
-        # Previous style (faded)
+        # Previous (faded)
         draw.text((self.width // 2, cy - 250),
-                  style_names[prev_idx].upper(),
+                  names[prev_idx].upper(),
                   anchor="mm", font=self.font_med, fill=180)
-
         draw.line([(300, cy - 150), (self.width - 300, cy - 150)], fill=160, width=2)
 
-        # Current style (bold)
+        # Current (bold)
         draw.text((self.width // 2, cy - 30),
-                  style_names[current_idx].upper(),
+                  names[current_idx].upper(),
                   anchor="mm", font=self.font_big, fill=0)
-
         # Description
-        short_desc = style_descs[current_idx][:55] + "..."
+        short_desc = descs[current_idx][:55] + "..."
         draw.text((self.width // 2, cy + 70),
                   short_desc, anchor="mm", font=self.font_small, fill=100)
 
         draw.line([(300, cy + 150), (self.width - 300, cy + 150)], fill=160, width=2)
 
-        # Next style (faded)
+        # Next (faded)
         draw.text((self.width // 2, cy + 250),
-                  style_names[next_idx].upper(),
+                  names[next_idx].upper(),
                   anchor="mm", font=self.font_med, fill=180)
 
         self.display.show_image(img, mode=MODE_A2)
 
+    def show_text_result(self, mode_name, text):
+        """Display AI-generated text with title and word-wrapped body."""
+        self.display.clear(MODE_INIT)
+
+        img = Image.new('L', (self.width, self.height), 255)
+        draw = ImageDraw.Draw(img)
+
+        margin = 100
+        max_text_width = self.width - margin * 2
+
+        title_y = 80
+        draw.text((self.width // 2, title_y), mode_name.upper(),
+                  anchor="mm", font=self.font_med, fill=0)
+
+        divider_y = title_y + 50
+        draw.line([(margin, divider_y), (self.width - margin, divider_y)],
+                  fill=120, width=2)
+
+        body_y = divider_y + 40
+        lines = self._wrap_text(text, self.font_body, max_text_width)
+        line_height = 48
+
+        for line in lines:
+            if body_y + line_height > self.height - 40:
+                break
+            draw.text((margin, body_y), line, font=self.font_body, fill=30)
+            body_y += line_height
+
+        self.display.show_image(img, mode=MODE_GC16)
+
     def _wrap_text(self, text, font, max_width):
-        """Word-wrap text to fit within max_width pixels. Returns list of lines."""
+        """Word-wrap text to fit within max_width pixels."""
         lines = []
         for paragraph in text.split('\n'):
             if not paragraph.strip():
@@ -180,36 +190,3 @@ class ScreenRenderer:
                     current_line = word
             lines.append(current_line)
         return lines
-
-    def show_text_result(self, mode_name, text):
-        """Display AI-generated text on e-ink with title and word-wrapped body."""
-        self.display.clear(MODE_INIT)
-
-        img = Image.new('L', (self.width, self.height), 255)
-        draw = ImageDraw.Draw(img)
-
-        margin = 100
-        max_text_width = self.width - margin * 2
-
-        # Title
-        title_y = 80
-        draw.text((self.width // 2, title_y), mode_name.upper(),
-                  anchor="mm", font=self.font_med, fill=0)
-
-        # Divider
-        divider_y = title_y + 50
-        draw.line([(margin, divider_y), (self.width - margin, divider_y)],
-                  fill=120, width=2)
-
-        # Word-wrapped body text
-        body_y = divider_y + 40
-        lines = self._wrap_text(text, self.font_body, max_text_width)
-        line_height = 48
-
-        for line in lines:
-            if body_y + line_height > self.height - 40:
-                break
-            draw.text((margin, body_y), line, font=self.font_body, fill=30)
-            body_y += line_height
-
-        self.display.show_image(img, mode=MODE_GC16)
