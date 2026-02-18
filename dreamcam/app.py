@@ -263,8 +263,8 @@ class DreamCamera:
                 if event is None:
                     continue
 
-                # --- Mode carousel (hold) ---
-                if event == HOLD and not style_browsing:
+                # --- Mode carousel (hold to enter, click to confirm) ---
+                if event == HOLD and not style_browsing and not mode_carousel_active:
                     mode_carousel_active = True
                     cur_idx = MODE_KEYS.index(mode)
                     mode_carousel_idx = (cur_idx + 1) % len(MODE_KEYS)
@@ -273,17 +273,26 @@ class DreamCamera:
                         MODE_NAMES, MODE_DESCS, mode_carousel_idx, first_frame=True)
                     print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
                           end='', flush=True)
-                    # Wait for click to confirm
-                    self._wait_for_mode_select(inp, mode_carousel_idx)
-                    selected = MODE_KEYS[mode_carousel_idx]
-                    mode_carousel_active = False
-                    mode, last_advance, slideshow_paused = self._switch_mode(
-                        mode, selected, now, slideshow_paused)
                     continue
 
                 if event == QUIT:
                     print("\r\nQuitting...\r\n", end='')
                     break
+
+                # --- Mode carousel selection ---
+                if mode_carousel_active:
+                    if event == CLICK:
+                        selected = MODE_KEYS[mode_carousel_idx]
+                        mode_carousel_active = False
+                        mode, last_advance, slideshow_paused = self._switch_mode(
+                            mode, selected, now, slideshow_paused)
+                        print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
+                              end='', flush=True)
+                    elif event == DOUBLE_CLICK:
+                        mode_carousel_active = False
+                        print("\r\n[Mode cancelled]\r\n", end='', flush=True)
+                        self._switch_mode(mode, mode, now, slideshow_paused)
+                    continue
 
                 # --- Style browsing ---
                 if style_browsing:
@@ -350,13 +359,6 @@ class DreamCamera:
                     mode = MODE_CAPTURE
                     style_browsing = False
                     self.screen.show_capture_mode()
-
-    def _wait_for_mode_select(self, inp: InputManager, carousel_idx: int):
-        """Block until user clicks to confirm mode selection."""
-        while True:
-            event = inp.poll()
-            if event in (CLICK, DOUBLE_CLICK, QUIT):
-                return
 
     def _switch_mode(self, current: str, selected: str,
                      now: float, slideshow_paused: bool):
