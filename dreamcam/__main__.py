@@ -39,6 +39,10 @@ def main(argv: list[str] | None = None):
                         help='Save images to directory (default: ./dreams)')
     parser.add_argument('--no-save', action='store_true',
                         help='Disable auto-saving images')
+    parser.add_argument('--web', action='store_true',
+                        help='Enable web remote control')
+    parser.add_argument('--web-port', type=int, default=8000,
+                        help='Web server port (default: 8000)')
     args = parser.parse_args(argv)
 
     # Resolve backend
@@ -61,11 +65,23 @@ def main(argv: list[str] | None = None):
     api_key = os.environ.get('GOOGLE_API_KEY')
     transformer = Transformer(api_key=api_key)
 
+    # Web remote setup (wraps display before passing to DreamCamera)
+    bridge = None
+    if args.web:
+        from dreamcam.web.proxy import DisplayProxy
+        from dreamcam.web.bridge import EventBridge
+        display = DisplayProxy(display)
+        bridge = EventBridge()
+
     # Create and run camera
     camera = DreamCamera(display=display, transformer=transformer, save_dir=save_dir)
 
     from dreamcam.styles import get_style
     camera.style = get_style(args.style)
+
+    if args.web:
+        from dreamcam.web import start_server
+        start_server(camera, bridge, port=args.web_port)
 
     if args.once:
         print(f"Style: {camera.style.name}")
@@ -74,7 +90,7 @@ def main(argv: list[str] | None = None):
     else:
         gpio_pin = None if args.no_button else args.gpio
         try:
-            camera.run(gpio_pin=gpio_pin)
+            camera.run(gpio_pin=gpio_pin, web_bridge=bridge)
         finally:
             camera.display.close()
 
