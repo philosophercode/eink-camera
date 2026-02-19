@@ -231,8 +231,10 @@ class DreamCamera:
         print("  Hold / m     - Switch mode")
         print("  c - Clear | r - Reset | q - Quit\n")
 
-        self.screen.show_splash("Digital Polaroid", duration=2.5)
-        self.screen.show_capture_mode()
+        # Skip splash if web mode is active (QR code is already showing)
+        if not web_bridge:
+            self.screen.show_splash("Digital Polaroid", duration=2.5)
+            self.screen.show_capture_mode()
 
         mode = MODE_CAPTURE
         last_advance = time.time()

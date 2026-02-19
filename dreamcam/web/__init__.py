@@ -6,11 +6,29 @@ uvicorn/fastapi aren't installed.
 
 from __future__ import annotations
 
+import socket
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dreamcam.app import DreamCamera
     from dreamcam.web.bridge import EventBridge
+
+
+def get_local_ip() -> str:
+    """Get the Pi's local network IP address."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def get_web_url(port: int = 8000) -> str:
+    """Get the full URL for the web remote."""
+    return f"http://{get_local_ip()}:{port}"
 
 
 def start_server(camera: DreamCamera, bridge: EventBridge,
@@ -28,4 +46,6 @@ def start_server(camera: DreamCamera, bridge: EventBridge,
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
-    print(f"  Web remote: http://{host}:{port}")
+
+    url = get_web_url(port)
+    print(f"  Web remote: {url}")

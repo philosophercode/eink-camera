@@ -23,6 +23,7 @@ web = [
     "fastapi>=0.100",
     "uvicorn[standard]>=0.20",
     "python-multipart>=0.0.6",
+    "qrcode>=7.0",
 ]
 all = [
     "dreamcam[ai,gpio,web]",

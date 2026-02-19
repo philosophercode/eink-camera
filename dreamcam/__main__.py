@@ -80,8 +80,11 @@ def main(argv: list[str] | None = None):
     camera.style = get_style(args.style)
 
     if args.web:
-        from dreamcam.web import start_server
+        from dreamcam.web import start_server, get_web_url
         start_server(camera, bridge, port=args.web_port)
+        # Show QR code on e-ink so user can scan to connect
+        url = get_web_url(args.web_port)
+        camera.screen.show_qr_code(url, duration=0.0)
 
     if args.once:
         print(f"Style: {camera.style.name}")
