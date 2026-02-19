@@ -6,61 +6,72 @@ Boxes.py-inspired construction: burn compensation, corner relief,
 finger joints on all mating edges, hinged back plate.
 
 Run: python3 enclosure.py
-Output: enclosure.svg
+Output: enclosure_YYYYMMDD_HHMMSS.svg (+ enclosure_latest.svg)
 """
 
 import math
+import os
+from datetime import datetime
 
-# === MATERIAL & FABRICATION ===
+# ============================================================
+# INPUTS — tweak these to change the enclosure
+# ============================================================
+
+# --- Material & Fabrication ---
 T = 3.0           # material thickness (mm)
 BURN = 0.1        # laser kerf compensation (mm) — holes shrink, tabs grow
 RELIEF_R = 0.5    # corner relief radius (mm)
 TAB_W = 12.0      # target finger joint tab width (mm)
 
-# === INTERNAL BOX DIMENSIONS (mm) ===
-W = 140           # width: panel 127.6 + 6.2mm border each side
-H = 212           # height: 28mm camera + 173.8mm display + 10.2mm bottom border
-D = 30            # depth: display + Pi stack + cables
+# --- Box size (internal mm) ---
+W = 144           # internal width  (panel 127.6 + 8.2mm border each side)
+D = 29            # internal depth  (display + Pi stack + cables)
 
-# === DISPLAY WINDOW ===
-DISP_W = 127.6    # panel outline width (as measured)
-DISP_H = 173.8    # panel outline height (as measured)
-DISP_R = 2.0      # corner radius
-# Window is centered horizontally; vertically offset down to leave room for camera
-# Panel outline is 127.6 x 173.8, centered in 134 x 202 internal space
-# Camera gets the top 28mm, display centered in remaining 174mm zone
-DISP_CX = W / 2                          # centered horizontally
-DISP_CY = 28 + 173.8 / 2                 # center of panel zone (below camera area)
+# --- Vertical layout (mm, top to bottom inside the box) ---
+CAM_ZONE = 43     # space above display for camera module
+BOTTOM_BORDER = 12.2  # border below display
 
-# === CAMERA ===
+# --- Display viewport (7.8" e-ink active area) ---
+DISP_W = 119.0    # active area width in portrait + tolerance
+DISP_H = 159.0    # active area height in portrait + tolerance
+DISP_R = 2.0      # window corner radius
+
+# --- Camera ---
 CAM_D = 8.0       # hole diameter (lens barrel ~7mm + clearance)
-CAM_CX = W / 2    # centered horizontally
-CAM_CY = 14.0     # 14mm from top edge (centered in 28mm camera zone)
+CAM_CY = 14.0     # center distance from top internal edge
 
-# === BUTTON (right wall) ===
+# --- Button (right wall) ---
 BTN_D = 12.0      # panel hole diameter
 
-# === USB-C CUTOUT (bottom wall, front edge) ===
+# --- USB-C cutout (bottom wall) ---
 USB_W = 12.0
 USB_H = 7.0
 
-# === PI 5 MOUNTING (back plate) ===
+# --- Pi 5 mounting (back plate) ---
 PI_HOLE_D = 2.5       # M2.5 holes
 PI_HOLE_SPACING_X = 58.0
 PI_HOLE_SPACING_Y = 49.0
-PI_HOLE_INSET_X = 3.5   # from Pi board edge
+PI_HOLE_INSET_X = 3.5
 PI_HOLE_INSET_Y = 3.5
 
-# === OUTER DIMENSIONS ===
-OW = W + 2 * T    # outer width: 140mm
-OH = H + 2 * T    # outer height: 208mm
+# ============================================================
+# DERIVED — computed from inputs above
+# ============================================================
 
-# === BACK PLATE ===
-# Same outer dimensions as front plate — attaches with hinges
+H = CAM_ZONE + DISP_H + BOTTOM_BORDER    # internal height
+OW = W + 2 * T                            # outer width
+OH = H + 2 * T                            # outer height
 BACK_W = OW
 BACK_H = OH
 
-# === SVG LAYOUT ===
+# Display window position (centered horizontally, below camera zone)
+DISP_CX = W / 2
+DISP_CY = CAM_ZONE + DISP_H / 2
+
+# Camera position (centered horizontally)
+CAM_CX = W / 2
+
+# SVG layout
 SPACING = 15
 
 
@@ -230,18 +241,22 @@ def finger_slot_edge(x1, y1, x2, y2):
 
 def front_plate(ox, oy):
     """Front plate (OW x OH): display window, camera hole.
-    Finger joint SLOTS on all 4 edges to receive wall tabs."""
+    Finger joint SLOTS on all 4 edges. Top/bottom edges have T inset
+    (solid corners where side walls sit), slots only in middle W portion."""
     w, h = OW, OH
 
-    # Outline with finger slots on all 4 edges
     path = f"M{fmt(ox)},{fmt(oy)}"
-    # Top edge (L to R)
-    path += " " + finger_slot_edge(ox, oy, ox + w, oy)
-    # Right edge (top to bottom)
+    # Top edge (L to R): T solid + W slots + T solid
+    path += f" L{fmt(ox + T)},{fmt(oy)}"
+    path += " " + finger_slot_edge(ox + T, oy, ox + T + W, oy)
+    path += f" L{fmt(ox + w)},{fmt(oy)}"
+    # Right edge (top to bottom): full slots for side wall
     path += " " + finger_slot_edge(ox + w, oy, ox + w, oy + h)
-    # Bottom edge (R to L)
-    path += " " + finger_slot_edge(ox + w, oy + h, ox, oy + h)
-    # Left edge (bottom to top)
+    # Bottom edge (R to L): T solid + W slots + T solid
+    path += f" L{fmt(ox + w - T)},{fmt(oy + h)}"
+    path += " " + finger_slot_edge(ox + w - T, oy + h, ox + T, oy + h)
+    path += f" L{fmt(ox)},{fmt(oy + h)}"
+    # Left edge (bottom to top): full slots for side wall
     path += " " + finger_slot_edge(ox, oy + h, ox, oy)
     path += "Z"
 
@@ -259,15 +274,23 @@ def front_plate(ox, oy):
 
 
 def back_plate(ox, oy):
-    """Back plate (OW x OH): finger joint slots on all 4 edges (same as front),
+    """Back plate (OW x OH): finger joint slots on all 4 edges (mirrors front),
     attaches with hinges. Pi 5 mounting holes."""
     w, h = BACK_W, BACK_H
 
-    # Outline with finger slots on all 4 edges (mirrors front plate)
+    # Outline with finger slots — top/bottom inset like front plate
     path = f"M{fmt(ox)},{fmt(oy)}"
-    path += " " + finger_slot_edge(ox, oy, ox + w, oy)
+    # Top edge: T solid + W slots + T solid
+    path += f" L{fmt(ox + T)},{fmt(oy)}"
+    path += " " + finger_slot_edge(ox + T, oy, ox + T + W, oy)
+    path += f" L{fmt(ox + w)},{fmt(oy)}"
+    # Right edge: full slots for side wall
     path += " " + finger_slot_edge(ox + w, oy, ox + w, oy + h)
-    path += " " + finger_slot_edge(ox + w, oy + h, ox, oy + h)
+    # Bottom edge: T solid + W slots + T solid
+    path += f" L{fmt(ox + w - T)},{fmt(oy + h)}"
+    path += " " + finger_slot_edge(ox + w - T, oy + h, ox + T, oy + h)
+    path += f" L{fmt(ox)},{fmt(oy + h)}"
+    # Left edge: full slots for side wall
     path += " " + finger_slot_edge(ox, oy + h, ox, oy)
     path += "Z"
 
@@ -289,17 +312,18 @@ def back_plate(ox, oy):
 
 
 def top_wall(ox, oy):
-    """Top wall (OW x D): finger tabs on all 4 edges."""
-    w, h = OW, D
+    """Top wall (W x D): fits between side walls. Tabs on all edges —
+    long edges into front/back plates, short edges into side wall slots."""
+    w, h = W, D
 
     path = f"M{fmt(ox)},{fmt(oy)}"
     # Back edge (top in SVG): tabs (mates with back plate slots)
     path += " " + finger_tab_edge(ox, oy, ox + w, oy)
-    # Right edge: tabs
+    # Right edge: tabs (into right side wall slots)
     path += " " + finger_tab_edge(ox + w, oy, ox + w, oy + h)
-    # Front edge (bottom in SVG): tabs
+    # Front edge (bottom in SVG): tabs (mates with front plate slots)
     path += " " + finger_tab_edge(ox + w, oy + h, ox, oy + h)
-    # Left edge: tabs
+    # Left edge: tabs (into left side wall slots)
     path += " " + finger_tab_edge(ox, oy + h, ox, oy)
     path += "Z"
 
@@ -307,17 +331,18 @@ def top_wall(ox, oy):
 
 
 def bottom_wall(ox, oy):
-    """Bottom wall (OW x D): finger tabs on all 4 edges + USB-C cutout."""
-    w, h = OW, D
+    """Bottom wall (W x D): fits between side walls. Tabs on all edges —
+    long edges into front/back plates, short edges into side wall slots + USB-C cutout."""
+    w, h = W, D
 
     path = f"M{fmt(ox)},{fmt(oy)}"
-    # Back edge: tabs
+    # Back edge: tabs (mates with back plate slots)
     path += " " + finger_tab_edge(ox, oy, ox + w, oy)
-    # Right edge: tabs
+    # Right edge: tabs (into right side wall slots)
     path += " " + finger_tab_edge(ox + w, oy, ox + w, oy + h)
-    # Front edge: tabs
+    # Front edge: tabs (mates with front plate slots)
     path += " " + finger_tab_edge(ox + w, oy + h, ox, oy + h)
-    # Left edge: tabs
+    # Left edge: tabs (into left side wall slots)
     path += " " + finger_tab_edge(ox, oy + h, ox, oy)
     path += "Z"
 
@@ -330,18 +355,19 @@ def bottom_wall(ox, oy):
 
 
 def side_wall_path(ox, oy, button=False):
-    """Side wall (OH x D): finger tabs on all 4 edges. Optional button hole."""
+    """Side wall (OH x D): tabs on long edges (front/back plates),
+    slots on short edges (receive top/bottom wall tabs). Optional button hole."""
     w, h = OH, D
 
     path = f"M{fmt(ox)},{fmt(oy)}"
     # Back edge (top in SVG): tabs (mates with back plate slots)
     path += " " + finger_tab_edge(ox, oy, ox + w, oy)
-    # Bottom-of-box edge (right in SVG, going down): tabs
-    path += " " + finger_tab_edge(ox + w, oy, ox + w, oy + h)
-    # Front edge (bottom in SVG, R to L): tabs
+    # Bottom-of-box edge (right in SVG): slots (receive bottom wall tabs)
+    path += " " + finger_slot_edge(ox + w, oy, ox + w, oy + h)
+    # Front edge (bottom in SVG, R to L): tabs (mates with front plate slots)
     path += " " + finger_tab_edge(ox + w, oy + h, ox, oy + h)
-    # Top-of-box edge (left in SVG, going up): tabs
-    path += " " + finger_tab_edge(ox, oy + h, ox, oy)
+    # Top-of-box edge (left in SVG): slots (receive top wall tabs)
+    path += " " + finger_slot_edge(ox, oy + h, ox, oy)
     path += "Z"
 
     if button:
@@ -363,11 +389,54 @@ def right_wall(ox, oy):
 
 
 # ============================================================
+# Dimension legend
+# ============================================================
+
+def dimension_legend(ox, oy):
+    """Generate SVG text block showing all dimensions."""
+    lines = [
+        f"E-INK CAMERA ENCLOSURE",
+        f"",
+        f"Box (outer):  {OW:.1f} x {OH:.1f} x {D + 2*T:.1f} mm  "
+            f"({OW/25.4:.2f} x {OH/25.4:.2f} x {(D+2*T)/25.4:.2f} in)  "
+            f"({OW/10:.1f} x {OH/10:.1f} x {(D+2*T)/10:.1f} cm)",
+        f"Box (inner):  {W:.1f} x {H:.1f} x {D:.1f} mm",
+        f"Material:     {T:.1f}mm plywood, burn comp: {BURN}mm",
+        f"",
+        f"PANELS",
+        f"  Front plate:   {OW:.1f} x {OH:.1f} mm",
+        f"  Back plate:    {BACK_W:.1f} x {BACK_H:.1f} mm",
+        f"  Top wall:      {W:.1f} x {D:.1f} mm  (fits between side walls)",
+        f"  Bottom wall:   {W:.1f} x {D:.1f} mm  (fits between side walls)",
+        f"  Left wall:     {OH:.1f} x {D:.1f} mm",
+        f"  Right wall:    {OH:.1f} x {D:.1f} mm",
+        f"",
+        f"FEATURES",
+        f"  Display window:  {DISP_W} x {DISP_H} mm  (r={DISP_R}mm)",
+        f"  Camera hole:     {CAM_D}mm dia  ({CAM_CY}mm from top)",
+        f"  Camera zone:     {CAM_ZONE}mm above display",
+        f"  Button hole:     {BTN_D}mm dia  (right wall)",
+        f"  USB-C cutout:    {USB_W} x {USB_H} mm  (bottom wall)",
+    ]
+
+    text_elements = []
+    line_h = 5  # mm line height
+    for i, line in enumerate(lines):
+        y = oy + i * line_h
+        weight = 'font-weight="bold"' if line and not line.startswith(" ") else ""
+        text_elements.append(
+            f'<text x="{fmt(ox)}" y="{fmt(y)}" {weight}>{line}</text>'
+        )
+
+    return "\n    ".join(text_elements)
+
+
+# ============================================================
 # SVG generation
 # ============================================================
 
 def generate_svg():
-    """Lay out all 6 panels and generate SVG."""
+    """Lay out all 6 panels + dimension legend and generate SVG."""
     sp = SPACING
     margin = T + 1  # extra margin for protruding finger tabs
 
@@ -380,37 +449,41 @@ def generate_svg():
     # Row 3: Left wall + Right wall
     r3_y = r2_y + D + margin + sp + margin
 
+    # Legend below panels
+    legend_y = r3_y + D + margin + sp + 10
+
     # Width must fit the widest row (row 3 has two OH-wide side walls)
     r1_w = margin + OW + sp + BACK_W + margin
-    r2_w = margin + OW + sp + OW + margin
+    r2_w = margin + W + sp + W + margin
     r3_w = margin + OH + sp + OH + margin
     total_w = max(r1_w, r2_w, r3_w) + 2 * sp
-    total_h = r3_y + D + margin + sp
+    total_h = legend_y + 20 * 5 + sp  # 20 lines of legend
 
     # X offsets: center each row, or just use consistent left margin
     x0 = sp + margin
 
     parts = [
-        f'<!-- Front Plate {OW:.0f}x{OH:.0f}mm (slots on all edges) -->',
+        f'<!-- Front Plate {OW:.0f}x{OH:.0f}mm -->',
         front_plate(x0, r1_y),
 
-        f'<!-- Back Plate {BACK_W:.0f}x{BACK_H:.0f}mm (hinged, Pi mount) -->',
+        f'<!-- Back Plate {BACK_W:.0f}x{BACK_H:.0f}mm -->',
         back_plate(x0 + OW + sp, r1_y),
 
-        f'<!-- Top Wall {OW:.0f}x{D:.0f}mm (tabs all edges) -->',
+        f'<!-- Top Wall {W:.0f}x{D:.0f}mm -->',
         top_wall(x0, r2_y),
 
-        f'<!-- Bottom Wall {OW:.0f}x{D:.0f}mm (tabs + USB-C cutout) -->',
-        bottom_wall(x0 + OW + sp, r2_y),
+        f'<!-- Bottom Wall {W:.0f}x{D:.0f}mm -->',
+        bottom_wall(x0 + W + sp, r2_y),
 
-        f'<!-- Left Wall {OH:.0f}x{D:.0f}mm (tabs all edges) -->',
+        f'<!-- Left Wall {OH:.0f}x{D:.0f}mm -->',
         left_wall(x0, r3_y),
 
-        f'<!-- Right Wall {OH:.0f}x{D:.0f}mm (tabs + button) -->',
+        f'<!-- Right Wall {OH:.0f}x{D:.0f}mm -->',
         right_wall(x0 + OH + sp, r3_y),
     ]
 
     content = "\n    ".join(parts)
+    legend = dimension_legend(x0, legend_y)
 
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
@@ -422,27 +495,29 @@ def generate_svg():
   <g fill="none" stroke="red" stroke-width="0.1">
     {content}
   </g>
+  <g fill="#444" stroke="none" font-family="monospace" font-size="3.5">
+    {legend}
+  </g>
 </svg>'''
 
 
 if __name__ == "__main__":
     svg = generate_svg()
-    with open("enclosure.svg", "w") as f:
+
+    # Versioned output
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    versioned = f"enclosure_{ts}.svg"
+    with open(versioned, "w") as f:
         f.write(svg)
-    print(f"Generated enclosure.svg")
-    print(f"\nBox dimensions:")
-    print(f"  Outer:    {OW:.0f} x {OH:.0f} x {D + 2*T:.0f} mm")
-    print(f"  Internal: {W} x {H} x {D} mm")
-    print(f"  Material: {T}mm plywood, burn comp: {BURN}mm")
-    print(f"\nPanels:")
-    print(f"  Front plate:  {OW:.0f} x {OH:.0f} mm (finger slots, display window, camera hole)")
-    print(f"  Back plate:   {BACK_W:.0f} x {BACK_H:.0f} mm (finger slots, hinged, Pi 5 mount)")
-    print(f"  Top wall:     {OW:.0f} x {D:.0f} mm (finger tabs all edges)")
-    print(f"  Bottom wall:  {OW:.0f} x {D:.0f} mm (finger tabs, USB-C cutout)")
-    print(f"  Left wall:    {OH:.0f} x {D:.0f} mm (finger tabs all edges)")
-    print(f"  Right wall:   {OH:.0f} x {D:.0f} mm (finger tabs, button hole)")
-    print(f"\nFeatures:")
-    print(f"  Display window: {DISP_W}x{DISP_H}mm, {DISP_R}mm corners")
-    print(f"  Camera hole:    {CAM_D}mm dia")
-    print(f"  Button hole:    {BTN_D}mm dia (right wall)")
-    print(f"  USB-C cutout:   {USB_W}x{USB_H}mm (bottom wall)")
+
+    # Latest symlink
+    latest = "enclosure_latest.svg"
+    if os.path.islink(latest) or os.path.exists(latest):
+        os.remove(latest)
+    os.symlink(versioned, latest)
+
+    print(f"Generated {versioned}")
+    print(f"Linked   {latest} -> {versioned}")
+    print(f"\nBox: {OW/10:.1f} x {OH/10:.1f} x {(D+2*T)/10:.1f} cm "
+          f"({OW:.0f} x {OH:.0f} x {D+2*T:.0f} mm)")
+    print(f"Internal: {W} x {H:.1f} x {D} mm")
