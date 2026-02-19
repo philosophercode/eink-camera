@@ -30,6 +30,10 @@ KEY_CLEAR = 'key_clear'      # 'c' key
 KEY_RESET = 'key_reset'      # 'r' key
 KEY_MODE = 'key_mode'        # 'm' key
 
+# Web remote events
+WEB_SET_STYLE = 'web_set_style'
+WEB_UPLOAD = 'web_upload'
+
 # Timing
 HOLD_THRESHOLD = 1.5    # Seconds to register a hold
 CLICK_TIMEOUT = 0.4     # Seconds to wait for second click
@@ -40,11 +44,13 @@ POLL_INTERVAL = 0.05    # Seconds between polls when idle
 class InputManager:
     """Unified keyboard + GPIO input with event-based polling."""
 
-    def __init__(self, gpio_pin: int | None = None):
+    def __init__(self, gpio_pin: int | None = None, web_bridge=None):
         self._has_tty = False
         self._old_settings = None
         self._gpio_chip = None
         self._gpio_pin = gpio_pin
+        self._web_bridge = web_bridge
+        self.web_payload = None  # carries data for WEB_UPLOAD / WEB_SET_STYLE
 
         # Button state machine
         self._last_btn = 1
@@ -98,7 +104,8 @@ class InputManager:
         for the caller to sleep.
 
         Returns one of: CLICK, DOUBLE_CLICK, HOLD, QUIT,
-                        KEY_STYLE, KEY_CLEAR, KEY_RESET, KEY_MODE, or None.
+                        KEY_STYLE, KEY_CLEAR, KEY_RESET, KEY_MODE,
+                        WEB_SET_STYLE, WEB_UPLOAD, or None.
         """
         now = time.time()
 
@@ -109,6 +116,11 @@ class InputManager:
 
         # GPIO button
         event = self._poll_gpio(now)
+        if event:
+            return event
+
+        # Web remote commands
+        event = self._poll_web()
         if event:
             return event
 
@@ -192,6 +204,23 @@ class InputManager:
             return CLICK
         else:
             return DOUBLE_CLICK
+
+    def _poll_web(self) -> str | None:
+        """Check for web remote commands. Returns event or None."""
+        if self._web_bridge is None:
+            return None
+        cmd = self._web_bridge.poll_command()
+        if cmd is None:
+            return None
+        if cmd.action == "capture":
+            return CLICK
+        elif cmd.action == "set_style":
+            self.web_payload = cmd.payload
+            return WEB_SET_STYLE
+        elif cmd.action == "upload_dream":
+            self.web_payload = cmd.payload
+            return WEB_UPLOAD
+        return None
 
     def close(self):
         """Restore terminal and release GPIO."""

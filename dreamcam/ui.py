@@ -72,6 +72,49 @@ class ScreenRenderer:
         self.show_screen(text)
         time.sleep(duration)
 
+    def show_qr_code(self, url: str, duration: float = 0.0):
+        """Display a QR code with the URL on the e-ink screen."""
+        try:
+            import qrcode
+        except ImportError:
+            self.show_screen("Web Remote", subtitle=url)
+            if duration:
+                time.sleep(duration)
+            return
+
+        self.display.clear(MODE_INIT)
+
+        qr = qrcode.QRCode(box_size=1, border=2,
+                            error_correction=qrcode.constants.ERROR_CORRECT_M)
+        qr.add_data(url)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+        qr_img = qr_img.convert('L')
+
+        # Scale QR to fit nicely on the e-ink display
+        qr_size = min(self.height - 300, 700)
+        qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.NEAREST)
+
+        img = Image.new('L', (self.width, self.height), 255)
+        draw = ImageDraw.Draw(img)
+
+        # Title
+        draw.text((self.width // 2, 80), "SCAN TO CONNECT",
+                  anchor="mm", font=self.font_med, fill=0)
+
+        # QR code centered
+        qr_x = (self.width - qr_size) // 2
+        qr_y = (self.height - qr_size) // 2 + 20
+        img.paste(qr_img, (qr_x, qr_y))
+
+        # URL below QR
+        draw.text((self.width // 2, qr_y + qr_size + 40), url,
+                  anchor="mm", font=self.font_small, fill=80)
+
+        self.display.show_image(img, mode=MODE_GC16)
+        if duration:
+            time.sleep(duration)
+
     def show_capture_mode(self):
         """Idle screen with instructions."""
         self.show_screen(

@@ -20,7 +20,8 @@ from PIL import Image, ImageDraw
 from dreamcam.display import Display, MODE_A2, MODE_GC16, create_display
 from dreamcam.gallery import Gallery
 from dreamcam.input import (CLICK, DOUBLE_CLICK, HOLD, KEY_CLEAR, KEY_MODE,
-                             KEY_RESET, KEY_STYLE, QUIT, InputManager)
+                             KEY_RESET, KEY_STYLE, QUIT, WEB_SET_STYLE,
+                             WEB_UPLOAD, InputManager)
 from dreamcam.styles import (DEFAULT_STYLE, STYLES, Style, get_style,
                               style_names, style_prompts)
 from dreamcam.transform import Transformer
@@ -30,6 +31,7 @@ from dreamcam.ui import ScreenRenderer
 MODE_CAPTURE = 'capture'
 MODE_GALLERY = 'gallery'
 MODE_SLIDESHOW = 'slideshow'
+MODE_REMOTE = 'remote'
 
 MODE_NAMES = ['Capture', 'Gallery', 'Slideshow']
 MODE_DESCS = ['Take AI dream photos', 'Browse dreams manually', 'Auto-play every 60s']
@@ -88,8 +90,26 @@ class DreamCamera:
             self._process_image_mode(photo)
 
         self.capture_count += 1
+        self._maybe_auto_reset()
 
-        # Auto-reset to prevent e-ink freezing
+    def dream_and_display_image(self, image: Image.Image):
+        """Pipeline for an externally-provided image (e.g., phone upload).
+
+        Same as dream_and_display but skips libcamera capture.
+        """
+        preview = image.convert('L').resize((self.display.width, self.display.height))
+        self.display.show_image(preview, mode=MODE_A2)
+
+        if self.style.is_text_mode:
+            self._process_text_mode(image)
+        else:
+            self._process_image_mode(image)
+
+        self.capture_count += 1
+        self._maybe_auto_reset()
+
+    def _maybe_auto_reset(self):
+        """Auto-reset display to prevent e-ink freezing."""
         if self.capture_count % AUTO_RESET_INTERVAL == 0:
             print("\r[Auto-reset to prevent freeze]\r\n", end='', flush=True)
             self.display.reset()
@@ -201,7 +221,8 @@ class DreamCamera:
 
     # --- Main loop ---
 
-    def run(self, gpio_pin: int | None = None):
+    def run(self, gpio_pin: int | None = None, web_bridge=None,
+            web_url: str | None = None):
         """Interactive main loop with capture, gallery, and slideshow modes."""
         print(f"\n=== AI Dream Camera ===")
         print(f"Display: {self.display.width}x{self.display.height}")
@@ -212,8 +233,19 @@ class DreamCamera:
         print("  Hold / m     - Switch mode")
         print("  c - Clear | r - Reset | q - Quit\n")
 
-        self.screen.show_splash("Digital Polaroid", duration=2.5)
-        self.screen.show_capture_mode()
+        # Skip splash if web mode is active (QR code is already showing)
+        if not web_bridge:
+            self.screen.show_splash("Digital Polaroid", duration=2.5)
+            self.screen.show_capture_mode()
+
+        # Build mode lists (Remote only available with --web)
+        mode_names = list(MODE_NAMES)
+        mode_descs = list(MODE_DESCS)
+        mode_keys = list(MODE_KEYS)
+        if web_url:
+            mode_names.append('Remote')
+            mode_descs.append('Scan QR to connect phone')
+            mode_keys.append(MODE_REMOTE)
 
         mode = MODE_CAPTURE
         last_advance = time.time()
@@ -233,7 +265,7 @@ class DreamCamera:
         names = style_names()
         prompts = style_prompts()
 
-        with InputManager(gpio_pin=gpio_pin) as inp:
+        with InputManager(gpio_pin=gpio_pin, web_bridge=web_bridge) as inp:
             while True:
                 now = time.time()
 
@@ -252,11 +284,11 @@ class DreamCamera:
 
                 # Mode carousel auto-advance (during hold)
                 if mode_carousel_active and now - mode_carousel_last_advance >= CAROUSEL_INTERVAL:
-                    mode_carousel_idx = (mode_carousel_idx + 1) % len(MODE_KEYS)
+                    mode_carousel_idx = (mode_carousel_idx + 1) % len(mode_keys)
                     mode_carousel_last_advance = now
                     self.screen.show_style_carousel(
-                        MODE_NAMES, MODE_DESCS, mode_carousel_idx)
-                    print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
+                        mode_names, mode_descs, mode_carousel_idx)
+                    print(f"\r\n[Mode: {mode_names[mode_carousel_idx]}]\r\n",
                           end='', flush=True)
 
                 event = inp.poll()
@@ -266,12 +298,12 @@ class DreamCamera:
                 # --- Mode carousel (hold to enter, click to confirm) ---
                 if event == HOLD and not style_browsing and not mode_carousel_active:
                     mode_carousel_active = True
-                    cur_idx = MODE_KEYS.index(mode)
-                    mode_carousel_idx = (cur_idx + 1) % len(MODE_KEYS)
+                    cur_idx = mode_keys.index(mode)
+                    mode_carousel_idx = (cur_idx + 1) % len(mode_keys)
                     mode_carousel_last_advance = now
                     self.screen.show_style_carousel(
-                        MODE_NAMES, MODE_DESCS, mode_carousel_idx, first_frame=True)
-                    print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
+                        mode_names, mode_descs, mode_carousel_idx, first_frame=True)
+                    print(f"\r\n[Mode: {mode_names[mode_carousel_idx]}]\r\n",
                           end='', flush=True)
                     continue
 
@@ -282,16 +314,16 @@ class DreamCamera:
                 # --- Mode carousel selection ---
                 if mode_carousel_active:
                     if event == CLICK:
-                        selected = MODE_KEYS[mode_carousel_idx]
+                        selected = mode_keys[mode_carousel_idx]
                         mode_carousel_active = False
                         mode, last_advance, slideshow_paused = self._switch_mode(
-                            mode, selected, now, slideshow_paused)
-                        print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
+                            mode, selected, now, slideshow_paused, web_url)
+                        print(f"\r\n[Mode: {mode_names[mode_carousel_idx]}]\r\n",
                               end='', flush=True)
                     elif event == DOUBLE_CLICK:
                         mode_carousel_active = False
                         print("\r\n[Mode cancelled]\r\n", end='', flush=True)
-                        self._switch_mode(mode, mode, now, slideshow_paused)
+                        self._switch_mode(mode, mode, now, slideshow_paused, web_url)
                     continue
 
                 # --- Style browsing ---
@@ -312,7 +344,8 @@ class DreamCamera:
                 if event == CLICK:
                     if mode == MODE_CAPTURE:
                         print("\r\n[Capture]\r\n", end='', flush=True)
-                        self.dream_and_display()
+                        self._run_with_bridge(web_bridge,
+                                              lambda: self.dream_and_display())
                     elif mode == MODE_GALLERY and self.gallery.images:
                         self.gallery.next(self.display)
                     elif mode == MODE_SLIDESHOW and self.gallery.images:
@@ -336,10 +369,10 @@ class DreamCamera:
                         self.gallery.prev(self.display)
 
                 elif event == KEY_MODE:
-                    cur_idx = MODE_KEYS.index(mode)
-                    selected = MODE_KEYS[(cur_idx + 1) % len(MODE_KEYS)]
+                    cur_idx = mode_keys.index(mode)
+                    selected = mode_keys[(cur_idx + 1) % len(mode_keys)]
                     mode, last_advance, slideshow_paused = self._switch_mode(
-                        mode, selected, now, slideshow_paused)
+                        mode, selected, now, slideshow_paused, web_url)
                     print(f"\r\n[{mode.title()}]\r\n", end='', flush=True)
 
                 elif event == KEY_STYLE:
@@ -360,8 +393,36 @@ class DreamCamera:
                     style_browsing = False
                     self.screen.show_capture_mode()
 
+                elif event == WEB_SET_STYLE:
+                    self.style = get_style(inp.web_payload)
+                    print(f"\r[Web: style -> {self.style.name}]\r\n",
+                          end='', flush=True)
+
+                elif event == WEB_UPLOAD:
+                    if mode == MODE_CAPTURE:
+                        print("\r[Web: upload dream]\r\n", end='', flush=True)
+                        self._run_with_bridge(web_bridge,
+                                              lambda: self.dream_and_display_image(
+                                                  inp.web_payload))
+
+    @staticmethod
+    def _run_with_bridge(bridge, fn):
+        """Run fn(), updating bridge status if bridge is provided."""
+        if bridge:
+            from dreamcam.web.bridge import CameraStatus
+            bridge.set_status(CameraStatus.DREAMING)
+        try:
+            fn()
+            if bridge:
+                bridge.set_status(CameraStatus.DONE)
+        except Exception as e:
+            print(f"\rError: {e}\r\n", end='', flush=True)
+            if bridge:
+                bridge.set_status(CameraStatus.ERROR, str(e))
+
     def _switch_mode(self, current: str, selected: str,
-                     now: float, slideshow_paused: bool):
+                     now: float, slideshow_paused: bool,
+                     web_url: str | None = None):
         """Switch to a new mode. Returns (mode, last_advance, slideshow_paused)."""
         if selected == MODE_CAPTURE:
             if self.last_image:
@@ -369,6 +430,10 @@ class DreamCamera:
             else:
                 self.screen.show_capture_mode()
             return MODE_CAPTURE, now, False
+
+        if selected == MODE_REMOTE:
+            self.screen.show_qr_code(web_url)
+            return MODE_REMOTE, now, False
 
         # Gallery or slideshow — need images
         if current in (MODE_GALLERY, MODE_SLIDESHOW) and self.gallery.images:
