@@ -33,10 +33,9 @@ MODE_GALLERY = 'gallery'
 MODE_SLIDESHOW = 'slideshow'
 MODE_REMOTE = 'remote'
 
-MODE_NAMES = ['Capture', 'Gallery', 'Slideshow', 'Remote']
-MODE_DESCS = ['Take AI dream photos', 'Browse dreams manually',
-              'Auto-play every 60s', 'Scan QR to connect phone']
-MODE_KEYS = [MODE_CAPTURE, MODE_GALLERY, MODE_SLIDESHOW, MODE_REMOTE]
+MODE_NAMES = ['Capture', 'Gallery', 'Slideshow']
+MODE_DESCS = ['Take AI dream photos', 'Browse dreams manually', 'Auto-play every 60s']
+MODE_KEYS = [MODE_CAPTURE, MODE_GALLERY, MODE_SLIDESHOW]
 
 # Timing
 SLIDESHOW_INTERVAL = 60     # Seconds between auto-advance
@@ -239,6 +238,15 @@ class DreamCamera:
             self.screen.show_splash("Digital Polaroid", duration=2.5)
             self.screen.show_capture_mode()
 
+        # Build mode lists (Remote only available with --web)
+        mode_names = list(MODE_NAMES)
+        mode_descs = list(MODE_DESCS)
+        mode_keys = list(MODE_KEYS)
+        if web_url:
+            mode_names.append('Remote')
+            mode_descs.append('Scan QR to connect phone')
+            mode_keys.append(MODE_REMOTE)
+
         mode = MODE_CAPTURE
         last_advance = time.time()
         slideshow_paused = False
@@ -276,11 +284,11 @@ class DreamCamera:
 
                 # Mode carousel auto-advance (during hold)
                 if mode_carousel_active and now - mode_carousel_last_advance >= CAROUSEL_INTERVAL:
-                    mode_carousel_idx = (mode_carousel_idx + 1) % len(MODE_KEYS)
+                    mode_carousel_idx = (mode_carousel_idx + 1) % len(mode_keys)
                     mode_carousel_last_advance = now
                     self.screen.show_style_carousel(
-                        MODE_NAMES, MODE_DESCS, mode_carousel_idx)
-                    print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
+                        mode_names, mode_descs, mode_carousel_idx)
+                    print(f"\r\n[Mode: {mode_names[mode_carousel_idx]}]\r\n",
                           end='', flush=True)
 
                 event = inp.poll()
@@ -290,12 +298,12 @@ class DreamCamera:
                 # --- Mode carousel (hold to enter, click to confirm) ---
                 if event == HOLD and not style_browsing and not mode_carousel_active:
                     mode_carousel_active = True
-                    cur_idx = MODE_KEYS.index(mode)
-                    mode_carousel_idx = (cur_idx + 1) % len(MODE_KEYS)
+                    cur_idx = mode_keys.index(mode)
+                    mode_carousel_idx = (cur_idx + 1) % len(mode_keys)
                     mode_carousel_last_advance = now
                     self.screen.show_style_carousel(
-                        MODE_NAMES, MODE_DESCS, mode_carousel_idx, first_frame=True)
-                    print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
+                        mode_names, mode_descs, mode_carousel_idx, first_frame=True)
+                    print(f"\r\n[Mode: {mode_names[mode_carousel_idx]}]\r\n",
                           end='', flush=True)
                     continue
 
@@ -306,11 +314,11 @@ class DreamCamera:
                 # --- Mode carousel selection ---
                 if mode_carousel_active:
                     if event == CLICK:
-                        selected = MODE_KEYS[mode_carousel_idx]
+                        selected = mode_keys[mode_carousel_idx]
                         mode_carousel_active = False
                         mode, last_advance, slideshow_paused = self._switch_mode(
                             mode, selected, now, slideshow_paused, web_url)
-                        print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
+                        print(f"\r\n[Mode: {mode_names[mode_carousel_idx]}]\r\n",
                               end='', flush=True)
                     elif event == DOUBLE_CLICK:
                         mode_carousel_active = False
@@ -347,10 +355,6 @@ class DreamCamera:
                         else:
                             last_advance = now
                             self.gallery.show_current(self.display)
-                    elif mode == MODE_REMOTE:
-                        # Refresh QR code
-                        if web_url:
-                            self.screen.show_qr_code(web_url)
 
                 elif event == DOUBLE_CLICK:
                     if mode == MODE_CAPTURE:
@@ -365,8 +369,8 @@ class DreamCamera:
                         self.gallery.prev(self.display)
 
                 elif event == KEY_MODE:
-                    cur_idx = MODE_KEYS.index(mode)
-                    selected = MODE_KEYS[(cur_idx + 1) % len(MODE_KEYS)]
+                    cur_idx = mode_keys.index(mode)
+                    selected = mode_keys[(cur_idx + 1) % len(mode_keys)]
                     mode, last_advance, slideshow_paused = self._switch_mode(
                         mode, selected, now, slideshow_paused, web_url)
                     print(f"\r\n[{mode.title()}]\r\n", end='', flush=True)
@@ -428,12 +432,7 @@ class DreamCamera:
             return MODE_CAPTURE, now, False
 
         if selected == MODE_REMOTE:
-            if web_url:
-                self.screen.show_qr_code(web_url)
-            else:
-                self.screen.show_screen(
-                    "Remote", subtitle="Start with --web flag",
-                    body="sudo dreamcam /dev/sg0 --web")
+            self.screen.show_qr_code(web_url)
             return MODE_REMOTE, now, False
 
         # Gallery or slideshow — need images
