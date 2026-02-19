@@ -79,12 +79,13 @@ def main(argv: list[str] | None = None):
     from dreamcam.styles import get_style
     camera.style = get_style(args.style)
 
+    web_url = None
     if args.web:
         from dreamcam.web import start_server, get_web_url
         start_server(camera, bridge, port=args.web_port)
+        web_url = get_web_url(args.web_port)
         # Show QR code on e-ink so user can scan to connect
-        url = get_web_url(args.web_port)
-        camera.screen.show_qr_code(url, duration=0.0)
+        camera.screen.show_qr_code(web_url, duration=0.0)
 
     if args.once:
         print(f"Style: {camera.style.name}")
@@ -93,7 +94,7 @@ def main(argv: list[str] | None = None):
     else:
         gpio_pin = None if args.no_button else args.gpio
         try:
-            camera.run(gpio_pin=gpio_pin, web_bridge=bridge)
+            camera.run(gpio_pin=gpio_pin, web_bridge=bridge, web_url=web_url)
         finally:
             camera.display.close()
 

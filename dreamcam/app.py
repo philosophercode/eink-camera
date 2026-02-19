@@ -31,10 +31,12 @@ from dreamcam.ui import ScreenRenderer
 MODE_CAPTURE = 'capture'
 MODE_GALLERY = 'gallery'
 MODE_SLIDESHOW = 'slideshow'
+MODE_REMOTE = 'remote'
 
-MODE_NAMES = ['Capture', 'Gallery', 'Slideshow']
-MODE_DESCS = ['Take AI dream photos', 'Browse dreams manually', 'Auto-play every 60s']
-MODE_KEYS = [MODE_CAPTURE, MODE_GALLERY, MODE_SLIDESHOW]
+MODE_NAMES = ['Capture', 'Gallery', 'Slideshow', 'Remote']
+MODE_DESCS = ['Take AI dream photos', 'Browse dreams manually',
+              'Auto-play every 60s', 'Scan QR to connect phone']
+MODE_KEYS = [MODE_CAPTURE, MODE_GALLERY, MODE_SLIDESHOW, MODE_REMOTE]
 
 # Timing
 SLIDESHOW_INTERVAL = 60     # Seconds between auto-advance
@@ -220,7 +222,8 @@ class DreamCamera:
 
     # --- Main loop ---
 
-    def run(self, gpio_pin: int | None = None, web_bridge=None):
+    def run(self, gpio_pin: int | None = None, web_bridge=None,
+            web_url: str | None = None):
         """Interactive main loop with capture, gallery, and slideshow modes."""
         print(f"\n=== AI Dream Camera ===")
         print(f"Display: {self.display.width}x{self.display.height}")
@@ -306,13 +309,13 @@ class DreamCamera:
                         selected = MODE_KEYS[mode_carousel_idx]
                         mode_carousel_active = False
                         mode, last_advance, slideshow_paused = self._switch_mode(
-                            mode, selected, now, slideshow_paused)
+                            mode, selected, now, slideshow_paused, web_url)
                         print(f"\r\n[Mode: {MODE_NAMES[mode_carousel_idx]}]\r\n",
                               end='', flush=True)
                     elif event == DOUBLE_CLICK:
                         mode_carousel_active = False
                         print("\r\n[Mode cancelled]\r\n", end='', flush=True)
-                        self._switch_mode(mode, mode, now, slideshow_paused)
+                        self._switch_mode(mode, mode, now, slideshow_paused, web_url)
                     continue
 
                 # --- Style browsing ---
@@ -344,6 +347,10 @@ class DreamCamera:
                         else:
                             last_advance = now
                             self.gallery.show_current(self.display)
+                    elif mode == MODE_REMOTE:
+                        # Refresh QR code
+                        if web_url:
+                            self.screen.show_qr_code(web_url)
 
                 elif event == DOUBLE_CLICK:
                     if mode == MODE_CAPTURE:
@@ -361,7 +368,7 @@ class DreamCamera:
                     cur_idx = MODE_KEYS.index(mode)
                     selected = MODE_KEYS[(cur_idx + 1) % len(MODE_KEYS)]
                     mode, last_advance, slideshow_paused = self._switch_mode(
-                        mode, selected, now, slideshow_paused)
+                        mode, selected, now, slideshow_paused, web_url)
                     print(f"\r\n[{mode.title()}]\r\n", end='', flush=True)
 
                 elif event == KEY_STYLE:
@@ -410,7 +417,8 @@ class DreamCamera:
                 bridge.set_status(CameraStatus.ERROR, str(e))
 
     def _switch_mode(self, current: str, selected: str,
-                     now: float, slideshow_paused: bool):
+                     now: float, slideshow_paused: bool,
+                     web_url: str | None = None):
         """Switch to a new mode. Returns (mode, last_advance, slideshow_paused)."""
         if selected == MODE_CAPTURE:
             if self.last_image:
@@ -418,6 +426,15 @@ class DreamCamera:
             else:
                 self.screen.show_capture_mode()
             return MODE_CAPTURE, now, False
+
+        if selected == MODE_REMOTE:
+            if web_url:
+                self.screen.show_qr_code(web_url)
+            else:
+                self.screen.show_screen(
+                    "Remote", subtitle="Start with --web flag",
+                    body="sudo dreamcam /dev/sg0 --web")
+            return MODE_REMOTE, now, False
 
         # Gallery or slideshow — need images
         if current in (MODE_GALLERY, MODE_SLIDESHOW) and self.gallery.images:
